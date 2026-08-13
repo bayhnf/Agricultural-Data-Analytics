@@ -436,6 +436,29 @@ class RasterMaskingTest(unittest.TestCase):
         self.assertEqual(right["coverage_fraction"], 0.0)
 
 
+class CdlAcquisitionPathTest(unittest.TestCase):
+    def test_every_year_uses_the_official_service_download_path(self):
+        self.assertFalse(hasattr(assignment_module, "VERIFIED_2023_CACHE"))
+        self.assertNotIn("shutil", assignment_module.__dict__)
+        for year in assignment_module.CDL_YEARS:
+            with self.subTest(year=year):
+                with TemporaryDirectory() as tmp:
+                    raw_dir = Path(tmp)
+                    return_url = (f"https://example.test/"
+                                  f"CDL_{year}_19169.tif")
+                    with mock.patch.object(
+                            assignment_module, "_cached_download",
+                            return_value=("digest", "retrieved", True)
+                    ) as cached:
+                        result = assignment_module._acquire_cdl_raster(
+                            year, return_url, raw_dir)
+                    cached.assert_called_once_with(
+                        return_url, raw_dir / f"CDL_{year}_19169.tif")
+                    self.assertEqual(result, (
+                        raw_dir / f"CDL_{year}_19169.tif",
+                        "digest", "retrieved", True))
+
+
 class Assignment02ProductContractTest(unittest.TestCase):
     CROPS_PATH = Path("data/processed/assignment-02/cdl_EPSG4326.csv")
     JOINED_PATH = Path("data/processed/assignment-02/fields_with_crops.geojson")

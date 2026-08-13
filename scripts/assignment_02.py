@@ -5,7 +5,6 @@ from __future__ import annotations
 import html
 import json
 import re
-import shutil
 import xml.etree.ElementTree as ET
 import zipfile
 from datetime import datetime, timezone
@@ -220,8 +219,6 @@ CDL_YEARS = (2020, 2021, 2022, 2023)
 CDL_METADATA_URL = ("https://www.nass.usda.gov/Research_and_Science/"
                     "Cropland/metadata/metadata_ia23.htm")
 MINIMUM_COVERAGE = 0.70
-VERIFIED_2023_CACHE = Path(
-    "/home/bell/.cache/agri-course-source-audit/CDL_2023_19169.tif")
 
 
 def cdl_service_url(year: int) -> str:
@@ -305,14 +302,6 @@ def _fetch_metadata(url: str, destination: Path) -> tuple[str, bool]:
 def _acquire_cdl_raster(year: int, return_url: str, raw_dir: Path
                         ) -> tuple[Path, str, str, bool]:
     destination = raw_dir / f"CDL_{year}_{CDL_FIPS}.tif"
-    if (year == 2023 and VERIFIED_2023_CACHE.is_file()
-            and not destination.is_file()):
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(VERIFIED_2023_CACHE, destination)
-        digest = sha256_file(destination)
-        retrieved = datetime.fromtimestamp(
-            destination.stat().st_mtime, tz=timezone.utc).isoformat()
-        return destination, digest, retrieved, True
     digest, retrieved, cached = _cached_download(return_url, destination)
     return destination, digest, retrieved, cached
 
