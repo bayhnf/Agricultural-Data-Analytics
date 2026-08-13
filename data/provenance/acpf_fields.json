@@ -1,0 +1,21 @@
+{
+  "counts": {
+    "features_read": 7037,
+    "selected_fields": 25
+  },
+  "dataset": "acpf_fields",
+  "license_note": "ACPF field boundaries are USDA ARS public-domain field-analysis polygons derived from edited historical FSA Common Land Unit data; they do not represent current ownership or program boundaries.",
+  "output_crs": "EPSG:4326",
+  "producer": "scripts/assignment_02.py",
+  "retrieved_utc": "2026-08-13T10:52:44.905029+00:00",
+  "sha256": {
+    "data/raw/IA_ACPFfields2019.zip": "ef9e42cf4456da0c05b68db25a5f8fc02ac11d2ecd9d75fbe4ef741ebe56118f"
+  },
+  "source_crs": "ESRI:102039",
+  "source_name": "Iowa Field Boundaries 2019",
+  "source_organization": "USDA Agricultural Research Service (ACPF)",
+  "source_urls": [
+    "https://ndownloader.figshare.com/files/44528942"
+  ],
+  "source_version": "2019"
+}
