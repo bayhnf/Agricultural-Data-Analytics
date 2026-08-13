@@ -1,7 +1,7 @@
 # Agricultural Data Analytics Course Recreation — Design
 
 Date: 2026-08-13
-Status: Approved concept; written-spec review pending
+Status: Approved; amended during implementation planning
 Target repository: `bayhnf/Agricultural-Data-Analytics`
 
 ## 1. Goal
@@ -24,16 +24,17 @@ Success means:
 
 The single study area is Story County, Iowa. All field, crop, satellite, weather, and soil products must overlap this geography.
 
-The field sample will contain 25 real USDA Crop Sequence Boundary polygons. Selection will be deterministic:
+The field sample will contain 25 USDA ARS Agricultural Conservation Planning Framework (ACPF) field-boundary polygons. ACPF repurposes and edits pre-2008 FSA Common Land Unit boundaries for conservation planning, removes ownership and program information, and does not represent current ownership. A planning-time feasibility check found 4,046 eligible Story County polygons and at least 68 candidates in every grid cell. Selection will be deterministic:
 
-1. Clip candidate boundaries to Story County.
-2. Reject invalid, empty, and duplicate geometries.
-3. Use an equal-area CRS for area calculations.
-4. Divide the county extent into a 5 × 5 grid.
-5. In each grid cell, select the eligible field whose centroid is nearest the cell center, using the source identifier as the tie-breaker.
-6. Fail rather than silently substitute synthetic fields if 25 distinct eligible fields cannot be selected.
+1. Reproject the county and candidate boundaries to EPSG:5070.
+2. Reject invalid, empty, duplicate, and non-agricultural (`isAG != 1`) geometries.
+3. Retain fields whose centroid is inside Story County and whose geometry has at least 95% of its area inside the county.
+4. Divide the county extent into a 5 × 5 grid in EPSG:5070.
+5. In each grid cell, select the eligible field whose centroid is nearest the cell center, using ACPF `FBndID` as the tie-breaker.
+6. Preserve the selected source geometry and calculate its area in EPSG:5070.
+7. Fail rather than silently substitute synthetic fields if 25 distinct eligible fields cannot be selected.
 
-The committed field identifiers will be stable project identifiers derived from the source identifiers. Public source identifiers may remain in the provenance table when allowed by the source.
+The committed field identifiers will be stable project identifiers derived from ACPF `FBndID`. The public source identifier may remain in the provenance table.
 
 ### Time coverage
 
@@ -57,10 +58,11 @@ Only official or primary public sources will be used:
 | Dataset | Source | Project use |
 |---|---|---|
 | County boundary | U.S. Census Bureau TIGER/Line or Cartographic Boundary data | Exact Story County clip boundary |
-| Field boundaries and crop sequence | USDA NASS Crop Sequence Boundaries | Real field polygons and crop history |
+| Field boundaries | USDA ARS ACPF Iowa 2019 field boundaries, archive SHA-256 `ef9e42cf4456da0c05b68db25a5f8fc02ac11d2ecd9d75fbe4ef741ebe56118f` | Public field-analysis polygons derived from historical FSA CLU boundaries |
+| Crop history | USDA NASS Cropland Data Layer county rasters for FIPS `19169`, 2020–2023 | Per-field majority crop class and coverage |
 | Satellite imagery | Sentinel-2 Level-2A through a public STAC catalog, preferring public COG assets | Red band, near-infrared band, scene classification, and NDVI |
-| Weather | NASA POWER Daily API | Temperature, corrected precipitation, rolling averages, and anomalies |
-| Soil | USDA NRCS SSURGO and Soil Data Access | Soil polygons and component properties |
+| Weather | NASA POWER Daily API | Gridded assimilated temperature and precipitation estimates, rolling averages, and anomalies |
+| Soil | USDA NRCS Web Soil Survey SSURGO area `IA169`, snapshot dated 2025-09-09 | Soil polygons and component properties |
 
 Every acquisition step will write a small machine-readable provenance manifest containing:
 
@@ -167,7 +169,7 @@ Deliverables:
 - `data/processed/assignment-02/my_fields_map.html`;
 - a summary table describing field count, area, crop coverage, nulls, and duplicate handling.
 
-Field and crop schemas will be normalized before merging. Merge cardinality will be validated so a malformed join cannot silently duplicate fields.
+Each field receives one dominant CDL class per year through categorical raster zonal statistics. The output records the CDL code, official class name, majority fraction, and valid-pixel coverage. Fields below the required coverage remain null. The final join must preserve exactly one row per field and cannot silently duplicate fields.
 
 ### Assignment 3 — Exploratory data analysis
 
@@ -206,7 +208,7 @@ Deliverables:
 - `docs/reports/assignment-05-walkthrough.md`;
 - the selected scene manifest and field-level NDVI summary.
 
-Scene selection will be deterministic: query the fixed 2023 growing-season window, require study-area coverage, sort by cloud cover then acquisition timestamp and scene identifier, and choose the first valid scene. Scene Classification Layer pixels representing cloud, cirrus, cloud shadow, saturated/defective data, or no-data will be excluded. If no valid real scene is available, the step fails with an actionable error; synthetic imagery is forbidden.
+Scene selection will be deterministic: query the fixed 2023 growing-season window in Element 84 Earth Search, require study-area coverage, sort by cloud cover then acquisition timestamp and scene identifier, and choose the first scene with at least 70% valid Scene Classification Layer pixels across the selected fields. Scene Classification Layer pixels representing no-data, saturated/defective data, dark or topographic shadow, cloud shadow, cloud, cirrus, or snow/ice will be excluded. The 20 m classification layer will be resampled to the 10 m red-band grid with nearest-neighbor resampling. If no valid real scene is available, the step fails with an actionable error; synthetic imagery is forbidden.
 
 ### Assignment 6 — Weather analysis
 
@@ -220,7 +222,7 @@ Deliverables:
 - a 2023 anomaly relative to the 1991–2020 baseline;
 - `docs/assets/weather_trends.png`.
 
-The NASA POWER request will use the centroid of the selected fields, record all request parameters, and preserve API quality or fill-value handling in the manifest.
+The NASA POWER request will use the centroid of the selected fields, record all request parameters, convert fill values to null, and describe the result as a single-point gridded assimilated estimate rather than a station observation.
 
 ### Assignment 7 — Spatial integration and zonal statistics
 
@@ -259,6 +261,7 @@ Deliverables:
 - at least five earlier assignment visualizations;
 - sections for fields/crops, vegetation, weather, spatial integration, soil health, methods, limitations, and provenance;
 - accessible headings, color contrast, keyboard-usable navigation, and descriptive image text;
+- the attribution “Contains modified Copernicus Sentinel data 2023”;
 - a live GitHub Pages deployment.
 
 The dashboard will report the exact study area, sample size, imagery date, data coverage, and units. It will not present screening indicators as operational farm recommendations.
@@ -276,7 +279,7 @@ Acquisition and transformation code will:
 - fail loudly when an official source cannot produce the required real data;
 - write deterministic outputs with stable sorting and fixed selection rules.
 
-No fallback may generate synthetic boundaries, crop labels, satellite bands, NDVI values, weather observations, or soil measurements.
+No fallback may generate synthetic boundaries, crop labels, satellite bands, NDVI values, weather observations, or soil measurements. USDA NASS Crop Sequence Boundaries are excluded because USDA describes that product's boundaries as algorithmically generated; this project instead uses ACPF field-analysis polygons and states their historical and edited nature explicitly.
 
 ## 8. Testing and Verification
 
