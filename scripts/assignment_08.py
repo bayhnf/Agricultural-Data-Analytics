@@ -329,19 +329,30 @@ def aggregate_soil_metrics(
         for cokey, group in horizons.groupby("cokey", sort=False)
     }
     for component in components.itertuples(index=False):
-        metrics = _component_metrics(
-            horizon_groups.get(
-                component.cokey,
-                horizons.iloc[0:0],
-            )
+        component_horizons = horizon_groups.get(
+            component.cokey, horizons.iloc[0:0])
+        metrics = _component_metrics(component_horizons)
+        has_profile = any(
+            pd.notna(row.hzdept_r)
+            and pd.notna(row.hzdepb_r)
+            and horizon_overlap_cm(row.hzdept_r, row.hzdepb_r) > 0
+            for row in component_horizons.itertuples(index=False)
         )
         component_values.append({
             "mukey": component.mukey,
             "cokey": component.cokey,
             "comppct_r": component.comppct_r,
+            "has_profile": has_profile,
             **metrics,
         })
     component_values = pd.DataFrame(component_values)
+    soil_mapunit_keys = set(
+        component_values.loc[
+            component_values["comppct_r"].fillna(0).gt(0)
+            & component_values["has_profile"],
+            "mukey",
+        ]
+    )
 
     mapunit_metrics = {}
     for mukey, group in component_values.groupby("mukey", sort=False):
@@ -372,9 +383,12 @@ def aggregate_soil_metrics(
         fraction_sum = group["field_fraction"].sum()
         if fraction_sum > 1.000001:
             raise ValueError(f"{field_id} soil fractions exceed 1")
+        soil_fraction = group.loc[
+            group["mukey"].isin(soil_mapunit_keys), "field_fraction"
+        ].sum()
         row = {
             "field_id": field_id,
-            "soil_coverage_fraction": min(float(fraction_sum), 1.0),
+            "soil_coverage_fraction": min(float(soil_fraction), 1.0),
         }
         for metric, (_, coverage_column) in METRIC_SPECS.items():
             values = []

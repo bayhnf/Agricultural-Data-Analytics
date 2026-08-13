@@ -136,6 +136,7 @@ class SoilAggregationTest(unittest.TestCase):
             components_frame(
                 ("M1", "A", 50, "organic"),
                 ("M1", "B", 50, "ph-only"),
+                ("WATER", "W", 100, "Water"),
             ),
             horizons_frame(
                 ("A", 0, 30, 4.0, None, None, None, None),
@@ -148,7 +149,7 @@ class SoilAggregationTest(unittest.TestCase):
         )
         self.assertAlmostEqual(result.loc[0, "organic_matter_pct"], 4.0)
         self.assertAlmostEqual(result.loc[0, "ph_h2o"], 7.0)
-        self.assertAlmostEqual(result.loc[0, "soil_coverage_fraction"], 1.0)
+        self.assertAlmostEqual(result.loc[0, "soil_coverage_fraction"], 0.8)
         self.assertAlmostEqual(result.loc[0, "om_coverage_fraction"], 0.4)
         self.assertAlmostEqual(result.loc[0, "ph_coverage_fraction"], 0.4)
         self.assertAlmostEqual(result.loc[0, "cec_coverage_fraction"], 0.4)
@@ -160,13 +161,16 @@ class SoilAggregationTest(unittest.TestCase):
 
     def test_water_only_field_is_retained_with_null_metrics(self):
         result = aggregate_soil_metrics(
-            components_frame(("M1", "A", 100, "soil")),
+            components_frame(
+                ("M1", "A", 100, "soil"),
+                ("WATER", "W", 100, "Water"),
+            ),
             horizons_frame(
                 ("A", 0, 30, 4.0, 6.0, 10.0, 1.3, 0.2)),
             overlaps_frame(("F2", "WATER", 1.0)),
         )
         self.assertEqual(result["field_id"].tolist(), ["F2"])
-        self.assertAlmostEqual(result.loc[0, "soil_coverage_fraction"], 1.0)
+        self.assertAlmostEqual(result.loc[0, "soil_coverage_fraction"], 0.0)
         for metric in (
             "organic_matter_pct",
             "ph_h2o",
