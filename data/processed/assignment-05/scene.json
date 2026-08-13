@@ -1,0 +1,32 @@
+{
+  "assets": {
+    "nir": {
+      "cache_file": "data/raw/sentinel/S2B_15TVG_20230620_0_L2A_nir.tif",
+      "offset": -0.1,
+      "scale": 0.0001
+    },
+    "red": {
+      "cache_file": "data/raw/sentinel/S2B_15TVG_20230620_0_L2A_red.tif",
+      "offset": -0.1,
+      "scale": 0.0001
+    },
+    "scl": {
+      "cache_file": "data/raw/sentinel/S2B_15TVG_20230620_0_L2A_scl.tif",
+      "resampling_to_red_grid": "nearest"
+    }
+  },
+  "collection": "sentinel-2-l2a",
+  "minimum_valid_scl_fraction": 0.7,
+  "rejected_candidates": [],
+  "search_datetime": "2023-06-01T00:00:00Z/2023-08-31T23:59:59Z",
+  "selected_scene_cloud_cover": 0.000607,
+  "selected_scene_datetime": "2023-06-20T17:12:11.504000Z",
+  "selected_scene_id": "S2B_15TVG_20230620_0_L2A",
+  "study_area_valid_scl_fraction": 1.0,
+  "valid_scl_classes": [
+    4,
+    5,
+    6,
+    7
+  ]
+}
