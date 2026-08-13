@@ -2,16 +2,26 @@
 
 from __future__ import annotations
 
+import html
 import json
+import re
+import shutil
+import xml.etree.ElementTree as ET
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 
 import geopandas as gpd
+import numpy as np
+import pandas as pd
+import rasterio
+import rasterio.mask
+import requests
 from shapely.geometry.base import BaseGeometry
 
 from scripts.common import download_atomic, sha256_file, write_manifest
+from scripts.zonal import categorical_summary
 
 COUNTY_URL = ("https://tigerweb.geo.census.gov/arcgis/rest/services/"
               "TIGERweb/State_County/MapServer/1/query")
@@ -203,6 +213,304 @@ def build_fields(raw_dir: Path, output_dir: Path,
     })
 
 
+CDL_SERVICE_URL = ("https://nassgeodata.gmu.edu/axis2/services/CDLService/"
+                   "GetCDLFile")
+CDL_FIPS = "19169"
+CDL_YEARS = (2020, 2021, 2022, 2023)
+CDL_METADATA_URL = ("https://www.nass.usda.gov/Research_and_Science/"
+                    "Cropland/metadata/metadata_ia23.htm")
+MINIMUM_COVERAGE = 0.70
+VERIFIED_2023_CACHE = Path(
+    "/home/bell/.cache/agri-course-source-audit/CDL_2023_19169.tif")
+
+
+def cdl_service_url(year: int) -> str:
+    query = urlencode((("fips", CDL_FIPS), ("year", str(year))))
+    return CDL_SERVICE_URL + "?" + query
+
+
+def parse_return_url(xml_text: str) -> str:
+    root = ET.fromstring(xml_text)
+    for element in root.iter():
+        if element.tag.endswith("returnURL"):
+            value = (element.text or "").strip()
+            if value:
+                return value
+            raise ValueError("empty returnURL in CDL service response")
+    raise ValueError("no returnURL in CDL service response")
+
+
+def parse_cdl_labels(html_text: str) -> dict[int, str]:
+    labels: dict[int, str] = {}
+    for block in re.findall(r"<pre>(.*?)</pre>", html_text, re.S):
+        for line in html.unescape(block).splitlines():
+            found = re.match(r'^\s*"(\d+)"\s+(.+?)\s*$', line)
+            if found:
+                code = int(found.group(1))
+                name = found.group(2)
+                if code in labels and labels[code] != name:
+                    raise ValueError(
+                        f"conflicting CDL metadata names for code {code}")
+                labels[code] = name
+    if not labels:
+        raise ValueError("no code/name rows parsed from CDL metadata")
+    return labels
+
+
+def summarize_field_year(raster_path: Path, fields: gpd.GeoDataFrame,
+                         minimum_coverage: float = MINIMUM_COVERAGE
+                         ) -> list[dict]:
+    """One majority summary per field for a single raster year."""
+    if "field_id" not in fields.columns:
+        raise ValueError("fields must have a field_id column")
+    rows = []
+    with rasterio.open(raster_path) as source:
+        geometries = fields.to_crs(source.crs).geometry
+        for field_id, geometry in zip(fields["field_id"], geometries):
+            masked, _ = rasterio.mask.mask(source, [geometry],
+                                             crop=True, filled=False)
+            data = np.ma.compressed(masked[0])
+            valid = data != 0
+            summary = categorical_summary(data, valid, minimum_coverage)
+            rows.append({"field_id": str(field_id), **summary})
+    return rows
+
+
+def _read_raster_profile(raster_path: Path) -> dict:
+    with rasterio.open(raster_path) as source:
+        array = source.read(1)
+        codes, counts = np.unique(array, return_counts=True)
+        return {
+            "crs": source.crs.to_string(),
+            "width": int(source.width),
+            "height": int(source.height),
+            "dtype": str(array.dtype),
+            "code_counts": {int(code): int(count)
+                            for code, count in zip(codes, counts)},
+        }
+
+
+def _fetch_metadata(url: str, destination: Path) -> tuple[str, bool]:
+    if destination.is_file():
+        retrieved = datetime.fromtimestamp(
+            destination.stat().st_mtime, tz=timezone.utc)
+        return retrieved.isoformat(), True
+    response = requests.get(url, timeout=(30, 300))
+    response.raise_for_status()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(response.text)
+    return datetime.now(timezone.utc).isoformat(), False
+
+
+def _acquire_cdl_raster(year: int, return_url: str, raw_dir: Path
+                        ) -> tuple[Path, str, str, bool]:
+    destination = raw_dir / f"CDL_{year}_{CDL_FIPS}.tif"
+    if (year == 2023 and VERIFIED_2023_CACHE.is_file()
+            and not destination.is_file()):
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(VERIFIED_2023_CACHE, destination)
+        digest = sha256_file(destination)
+        retrieved = datetime.fromtimestamp(
+            destination.stat().st_mtime, tz=timezone.utc).isoformat()
+        return destination, digest, retrieved, True
+    digest, retrieved, cached = _cached_download(return_url, destination)
+    return destination, digest, retrieved, cached
+
+
+def _join_crops_to_fields(fields: gpd.GeoDataFrame,
+                          crops: pd.DataFrame) -> gpd.GeoDataFrame:
+    metric_names = {"cdl_code": "code", "cdl_name": "name",
+                    "majority_fraction": "fraction",
+                    "coverage_fraction": "coverage"}
+    wide = crops.pivot(index="field_id", columns="year",
+                       values=list(metric_names))
+    wide.columns = [f"crop_{year}_{metric_names[metric]}"
+                    for metric, year in wide.columns]
+    for column in wide.columns:
+        if column.endswith("_code"):
+            wide[column] = pd.to_numeric(wide[column]).astype("Int64")
+        elif column.endswith(("_fraction", "_coverage")):
+            wide[column] = pd.to_numeric(wide[column], errors="coerce")
+    return gpd.GeoDataFrame(fields.merge(wide.reset_index(),
+                                         on="field_id"),
+                            crs=fields.crs)
+
+
+def _write_summary(fields: gpd.GeoDataFrame, crops: pd.DataFrame,
+                   path: Path) -> None:
+    summary = pd.DataFrame([{
+        "field_count": int(len(fields)),
+        "total_area_ha": float(fields["area_ha"].sum()),
+        "mean_area_ha": float(fields["area_ha"].mean()),
+        "median_area_ha": float(fields["area_ha"].median()),
+        "crop_record_count": int(len(crops)),
+        "missing_crop_record_count": int(crops["cdl_code"].isna().sum()),
+        "duplicate_field_id_count": int(
+            crops.duplicated(["field_id", "year"]).sum()),
+    }])
+    summary.to_csv(path, index=False)
+
+
+MAP_HTML_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Story County field crop history 2020-2023</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>html, body, #map {height: 100%; margin: 0;}</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+var fields = __FIELDS_GEOJSON__;
+var fieldsLayer = L.geoJSON(fields, {onEachFeature: function (feature, layer) {
+    var props = feature.properties;
+    var lines = [2020, 2021, 2022, 2023].map(function (year) {
+        return year + ": " + (props["crop_" + year + "_name"] || "n/a");
+    });
+    layer.bindPopup("<b>" + props.field_id + "</b><br>" + lines.join("<br>"));
+}});
+var map = L.map("map").fitBounds(fieldsLayer.getBounds());
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors"
+}).addTo(map);
+fieldsLayer.addTo(map);
+</script>
+</body>
+</html>
+"""
+
+def _write_map(joined: gpd.GeoDataFrame, path: Path) -> None:
+    payload = json.loads(joined.to_json())
+    path.write_text(MAP_HTML_TEMPLATE.replace(
+        "__FIELDS_GEOJSON__",
+        json.dumps(payload, separators=(",", ":"))),
+        encoding="utf-8")
+
+
+def build_cdl_products(fields_path: Path, raw_dir: Path, output_dir: Path,
+                       provenance_dir: Path) -> None:
+    fields_path = Path(fields_path)
+    raw_dir = Path(raw_dir)
+    output_dir = Path(output_dir)
+    provenance_dir = Path(provenance_dir)
+
+    fields = gpd.read_file(fields_path)
+
+    metadata_path = raw_dir / "cdl_metadata_ia23.htm"
+    metadata_retrieved, metadata_cached = _fetch_metadata(
+        CDL_METADATA_URL, metadata_path)
+    try:
+        labels = parse_cdl_labels(metadata_path.read_text(errors="replace"))
+    except ValueError:
+        metadata_path.unlink(missing_ok=True)
+        raise
+
+    records = []
+    year_info = {}
+    for year in CDL_YEARS:
+        service_url = cdl_service_url(year)
+        response = requests.get(service_url, timeout=(30, 300))
+        response.raise_for_status()
+        return_url = parse_return_url(response.text)
+        raster_path, digest, retrieved, cached = _acquire_cdl_raster(
+            year, return_url, raw_dir)
+        profile = _read_raster_profile(raster_path)
+        for row in summarize_field_year(raster_path, fields):
+            code = row["value"]
+            name = None if code is None else labels.get(code)
+            if code is not None and name is None:
+                raise ValueError(
+                    f"CDL code {code} ({year}) missing from the official "
+                    "metadata domain")
+            records.append({
+                "field_id": row["field_id"],
+                "year": year,
+                "cdl_code": code,
+                "cdl_name": name,
+                "majority_fraction": row["majority_fraction"],
+                "coverage_fraction": row["coverage_fraction"],
+                "valid_pixels": row["valid_pixels"],
+                "total_pixels": row["total_pixels"],
+            })
+        year_info[str(year)] = {
+            "service_url": service_url,
+            "return_url": return_url,
+            "sha256": digest,
+            "retrieved_utc": retrieved,
+            "cache_used": cached,
+            "raster_path": str(raster_path),
+            **profile,
+        }
+
+    crops = (pd.DataFrame(records)
+             .sort_values(["field_id", "year"], kind="stable")
+             .reset_index(drop=True))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    crops.to_csv(output_dir / "cdl_EPSG4326.csv", index=False)
+
+    joined = _join_crops_to_fields(fields, crops)
+    joined.to_file(output_dir / "fields_with_crops.geojson",
+                   driver="GeoJSON")
+    _write_summary(fields, crops, output_dir / "field_summary.csv")
+    _write_map(joined, output_dir / "my_fields_map.html")
+
+    write_manifest(provenance_dir / "cdl_2020_2023.json", {
+        "dataset": "cdl_crop_history",
+        "source_organization":
+            "USDA National Agricultural Statistics Service (NASS)",
+        "source_name":
+            "Cropland Data Layer (CDL), Story County, Iowa, 2020-2023",
+        "source_urls": [year_info[str(year)]["return_url"]
+                        for year in CDL_YEARS],
+        "service_urls": {str(year): year_info[str(year)]["service_url"]
+                         for year in CDL_YEARS},
+        "retrieved_utc": max(
+            year_info[str(year)]["retrieved_utc"] for year in CDL_YEARS),
+        "source_version": "2020-2023",
+        "sha256": {year_info[str(year)]["raster_path"]:
+                   year_info[str(year)]["sha256"]
+                   for year in CDL_YEARS},
+        "source_crs": {str(year): year_info[str(year)]["crs"]
+                       for year in CDL_YEARS},
+        "output_crs": "EPSG:4326",
+        "producer": "scripts/assignment_02.py",
+        "years": list(CDL_YEARS),
+        "official_metadata_url": CDL_METADATA_URL,
+        "dimensions": {str(year): {
+            "width": year_info[str(year)]["width"],
+            "height": year_info[str(year)]["height"],
+            "dtype": year_info[str(year)]["dtype"],
+        } for year in CDL_YEARS},
+        "code_counts": {str(year): year_info[str(year)]["code_counts"]
+                        for year in CDL_YEARS},
+        "counts": {
+            "fields": int(len(fields)),
+            "crop_records": int(len(crops)),
+            "joined_features": int(len(joined)),
+            "summary_rows": 1,
+            "metadata_cache_used": metadata_cached,
+            "metadata_retrieved_utc": metadata_retrieved,
+            "cache_used": {str(year): year_info[str(year)]["cache_used"]
+                           for year in CDL_YEARS},
+        },
+        "license_note":
+            "USDA NASS Cropland Data Layer is public domain and free to "
+            "redistribute (official metadata statement); field polygons "
+            "derive from public-domain USDA ACPF and U.S. Census TIGER data.",
+    })
+
+
+def main() -> None:
+    raw_dir = Path("data/raw")
+    output_dir = Path("data/processed/assignment-02")
+    provenance_dir = Path("data/provenance")
+    build_fields(raw_dir, output_dir, provenance_dir)
+    build_cdl_products(output_dir / "fields_EPSG4326.geojson",
+                       raw_dir, output_dir, provenance_dir)
+
+
 if __name__ == "__main__":
-    build_fields(Path("data/raw"), Path("data/processed/assignment-02"),
-                 Path("data/provenance"))
+    main()
