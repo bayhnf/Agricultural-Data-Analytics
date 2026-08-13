@@ -1,5 +1,6 @@
 {
   "counts": {
+    "cache_used": true,
     "features": 1
   },
   "dataset": "story_county_boundary",

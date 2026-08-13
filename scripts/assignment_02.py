@@ -94,16 +94,18 @@ def select_grid_fields(fields: gpd.GeoDataFrame,
 
 
 def _cached_download(url: str, destination: Path,
-                     expected_sha256: str | None = None) -> tuple[str, str]:
+                     expected_sha256: str | None = None
+                     ) -> tuple[str, str, bool]:
     if destination.is_file():
         digest = sha256_file(destination)
         if expected_sha256 and digest != expected_sha256:
-            raise ValueError(f"checksum mismatch for {destination}")
-        retrieved = datetime.fromtimestamp(
-            destination.stat().st_mtime, tz=timezone.utc)
-        return digest, retrieved.isoformat()
+            destination.unlink(missing_ok=True)
+        else:
+            retrieved = datetime.fromtimestamp(
+                destination.stat().st_mtime, tz=timezone.utc)
+            return digest, retrieved.isoformat(), True
     digest = download_atomic(url, destination, expected_sha256)
-    return digest, datetime.now(timezone.utc).isoformat()
+    return digest, datetime.now(timezone.utc).isoformat(), False
 
 
 def _extract_acpf(zip_path: Path, extract_dir: Path) -> Path:
@@ -137,7 +139,8 @@ def build_fields(raw_dir: Path, output_dir: Path,
 
     county_url = COUNTY_URL + "?" + urlencode(COUNTY_QUERY)
     county_path = raw_dir / "story_county.geojson"
-    county_digest, county_retrieved = _cached_download(county_url, county_path)
+    county_digest, county_retrieved, county_cached = _cached_download(
+        county_url, county_path)
     county_frame = _read_county(county_path)
     if len(county_frame) != 1:
         raise ValueError(f"expected 1 Story County feature, found "
@@ -147,7 +150,7 @@ def build_fields(raw_dir: Path, output_dir: Path,
         [county], crs=county_frame.crs).to_crs(5070).iloc[0]
 
     acpf_zip = raw_dir / "IA_ACPFfields2019.zip"
-    acpf_digest, acpf_retrieved = _cached_download(
+    acpf_digest, acpf_retrieved, acpf_cached = _cached_download(
         ACPF_URL, acpf_zip, ACPF_SHA256)
     acpf_dir = raw_dir / "acpf"
     layer_path = acpf_dir / ACPF_LAYER
@@ -174,7 +177,8 @@ def build_fields(raw_dir: Path, output_dir: Path,
         "source_crs": "EPSG:4326",
         "output_crs": "EPSG:4326",
         "producer": "scripts/assignment_02.py",
-        "counts": {"features": int(len(county_frame))},
+        "counts": {"features": int(len(county_frame)),
+                   "cache_used": county_cached},
         "license_note": "U.S. Census Bureau TIGER/Line data are U.S. "
                         "Government work and are in the public domain.",
     })
@@ -190,7 +194,8 @@ def build_fields(raw_dir: Path, output_dir: Path,
         "output_crs": "EPSG:4326",
         "producer": "scripts/assignment_02.py",
         "counts": {"features_read": int(len(fields)),
-                   "selected_fields": int(len(output))},
+                   "selected_fields": int(len(output)),
+                   "cache_used": acpf_cached},
         "license_note": "ACPF field boundaries are USDA ARS public-domain "
                         "field-analysis polygons derived from edited "
                         "historical FSA Common Land Unit data; they do not "

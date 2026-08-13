@@ -1,5 +1,6 @@
 {
   "counts": {
+    "cache_used": true,
     "features_read": 7037,
     "selected_fields": 25
   },
