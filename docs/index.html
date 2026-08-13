@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Static agricultural data analytics dashboard for Story County, Iowa.">
+  <title>Agricultural Data Analytics — Story County, Iowa</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-dashboard="data/dashboard.json">
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header>
+    <h1>Agricultural Data Analytics</h1>
+    <p class="lede"><strong>Story County, Iowa</strong> — deterministic ACPF
+      field-analysis units with 2020–2023 crop history, one growing-season
+      Sentinel-2 scene, NASA POWER 1991–2023, and an SSURGO snapshot dated
+      2025-09-09.</p>
+    <nav aria-label="Dashboard sections">
+      <ul class="nav-list">
+        <li><a href="#fields">Fields</a></li>
+        <li><a href="#vegetation">Vegetation</a></li>
+        <li><a href="#weather">Weather</a></li>
+        <li><a href="#integration">Integration</a></li>
+        <li><a href="#soil">Soil</a></li>
+        <li><a href="#methods">Methods</a></li>
+        <li><a href="#limitations">Limitations</a></li>
+        <li><a href="#provenance">Provenance</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <section id="kpis" aria-labelledby="kpis-heading">
+      <h2 id="kpis-heading">Key figures</h2>
+      <p id="kpi-status" role="status">Loading dashboard data…</p>
+      <ul class="kpi-grid">
+        <li>
+          <span class="kpi-label">Field count</span>
+          <strong class="kpi-value" data-kpi="field_count">—</strong>
+          <span class="kpi-unit">fields</span>
+        </li>
+        <li>
+          <span class="kpi-label">Total area</span>
+          <strong class="kpi-value" data-kpi="total_area_ha">—</strong>
+          <span class="kpi-unit">ha</span>
+        </li>
+        <li>
+          <span class="kpi-label">Dominant crop, 2023</span>
+          <strong class="kpi-value" data-kpi="dominant_crop_2023">—</strong>
+        </li>
+        <li>
+          <span class="kpi-label">Mean NDVI</span>
+          <strong class="kpi-value" data-kpi="mean_ndvi">—</strong>
+          <span class="kpi-unit">unitless (−1 to 1)</span>
+        </li>
+        <li>
+          <span class="kpi-label">NDVI coverage</span>
+          <strong class="kpi-value" data-kpi="ndvi_coverage_pct">—</strong>
+          <span class="kpi-unit">% of field pixels</span>
+        </li>
+        <li>
+          <span class="kpi-label">Scene date</span>
+          <strong class="kpi-value" data-kpi="scene_date">—</strong>
+        </li>
+        <li>
+          <span class="kpi-label">Temperature anomaly, 2023</span>
+          <strong class="kpi-value" data-kpi="t2m_anomaly_2023_c">—</strong>
+          <span class="kpi-unit">°C vs 1991–2020 baseline</span>
+        </li>
+        <li>
+          <span class="kpi-label">Precipitation, 2023</span>
+          <strong class="kpi-value" data-kpi="precip_2023_mm">—</strong>
+          <span class="kpi-unit">mm</span>
+        </li>
+        <li>
+          <span class="kpi-label">Mean organic matter</span>
+          <strong class="kpi-value" data-kpi="mean_organic_matter_pct">—</strong>
+          <span class="kpi-unit">%</span>
+        </li>
+        <li>
+          <span class="kpi-label">Mean pH</span>
+          <strong class="kpi-value" data-kpi="mean_ph">—</strong>
+          <span class="kpi-unit">pH units</span>
+        </li>
+        <li>
+          <span class="kpi-label">Mean cation exchange capacity</span>
+          <strong class="kpi-value" data-kpi="mean_cec_cmol_kg">—</strong>
+          <span class="kpi-unit">cmol(+)/kg</span>
+        </li>
+        <li>
+          <span class="kpi-label">Mean carbon storage</span>
+          <strong class="kpi-value" data-kpi="mean_carbon_storage_mg_c_ha">—</strong>
+          <span class="kpi-unit">Mg C/ha</span>
+        </li>
+      </ul>
+    </section>
+
+    <section id="fields" aria-labelledby="fields-heading">
+      <h2 id="fields-heading">Fields</h2>
+      <p>Twenty-five ACPF field-analysis units in Story County, Iowa, drawn
+        from USDA ARS Iowa Field Boundaries 2019.</p>
+      <figure>
+        <img src="assets/field_area_distribution.png" width="1280" height="800"
+             alt="Bar chart of the distribution of field areas across the 25 analysis units">
+        <figcaption>Field-area distribution across the 25 ACPF units. Areas
+          come from polygon geometry rather than surveyed field plans.</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/field_spatial_map.png" width="1600" height="1280"
+             alt="Map of the 25 field polygons across Story County, Iowa">
+        <figcaption>Spatial layout of the 25 field-analysis units.</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/crop_mix_2023.png" width="1120" height="800"
+             alt="Chart of the 2023 crop mix by CDL valid-pixel area">
+        <figcaption>2023 crop mix by CDL valid-pixel area. CDL crop classes
+          are satellite-derived estimates with classification
+          uncertainty.</figcaption>
+      </figure>
+    </section>
+
+    <section id="vegetation" aria-labelledby="vegetation-heading">
+      <h2 id="vegetation-heading">Vegetation</h2>
+      <p>Contains modified Copernicus Sentinel data 2023.</p>
+      <figure>
+        <img src="assets/ndvi_map.png" width="1280" height="1280"
+             alt="NDVI map from the June 20, 2023 Sentinel-2 scene">
+        <figcaption>NDVI over the June 20, 2023 Sentinel-2 scene. NDVI values
+          clipped at 1.0 are ceiling values and not precise rankings.</figcaption>
+      </figure>
+    </section>
+
+    <section id="weather" aria-labelledby="weather-heading">
+      <h2 id="weather-heading">Weather</h2>
+      <figure>
+        <img src="assets/weather_trends.png" width="1760" height="2080"
+             alt="NASA POWER temperature and precipitation trends for 1991 to 2023">
+        <figcaption>NASA POWER temperature and precipitation trends. POWER
+          values are single-point gridded assimilated estimates, not station
+          observations.</figcaption>
+      </figure>
+    </section>
+
+    <section id="integration" aria-labelledby="integration-heading">
+      <h2 id="integration-heading">Integration</h2>
+      <figure>
+        <img src="assets/integrated_spatial_analysis.png" width="2560" height="800"
+             alt="Integrated spatial analysis combining fields, crops, NDVI, weather, and soil">
+        <figcaption>Integrated spatial view combining field boundaries, crops,
+          NDVI, weather, and soil inputs.</figcaption>
+      </figure>
+    </section>
+
+    <section id="soil" aria-labelledby="soil-heading">
+      <h2 id="soil-heading">Soil</h2>
+      <figure>
+        <img src="assets/soil_health_metrics.png" width="2240" height="1760"
+             alt="Distributions of SSURGO soil health metrics across the 25 fields">
+        <figcaption>SSURGO soil-health metric distributions. These are
+          generalized screening estimates, not measured field samples,
+          operational erosion models, carbon-credit estimates, or farm
+          recommendations. Per-metric coverage varies; erosion K-factor has
+          the least-complete coverage.</figcaption>
+      </figure>
+    </section>
+
+    <section id="methods" aria-labelledby="methods-heading">
+      <h2 id="methods-heading">Methods</h2>
+      <p>Data sources: U.S. Census TIGER/Line (Story County boundary), USDA
+        ARS ACPF (Iowa Field Boundaries 2019), USDA NASS CDL (2020–2023 crop
+        history), Copernicus Sentinel-2 Level-2A processed by Element 84 (one
+        June 20, 2023 scene), NASA POWER (1991–2023 daily point estimates),
+        and USDA NRCS SSURGO (IA169 snapshot dated 2025-09-09).</p>
+      <p>ACPF polygons are edited historical CLU-derived analysis units, not
+        current ownership or program boundaries.</p>
+    </section>
+
+    <section id="limitations" aria-labelledby="limitations-heading">
+      <h2 id="limitations-heading">Limitations</h2>
+      <ul>
+        <li>ACPF polygons are edited historical CLU-derived analysis units,
+          not current ownership or program boundaries.</li>
+        <li>NASA POWER values are single-point gridded assimilated estimates,
+          not station observations.</li>
+        <li>NDVI values clipped at 1.0 are ceiling values and not precise
+          rankings.</li>
+        <li>SSURGO soil and carbon values are generalized screening
+          estimates, not measured field samples, operational erosion models,
+          carbon-credit estimates, or farm recommendations.</li>
+        <li>Per-metric SSURGO coverage varies; erosion K-factor has the
+          least-complete coverage.</li>
+      </ul>
+    </section>
+
+    <section id="provenance" aria-labelledby="provenance-heading">
+      <h2 id="provenance-heading">Provenance</h2>
+      <ul>
+        <li>U.S. Census Bureau — TIGER/Line Story County boundary.</li>
+        <li>USDA ARS ACPF — Iowa Field Boundaries 2019.</li>
+        <li>USDA NASS CDL — Story County crop history, 2020–2023.</li>
+        <li>Copernicus Sentinel-2 Level-2A, processed by Element 84 — scene
+          dated June 20, 2023. Contains modified Copernicus Sentinel data
+          2023.</li>
+        <li>NASA POWER — daily point estimates, 1991–2023.</li>
+        <li>USDA NRCS SSURGO — IA169 snapshot dated 2025-09-09.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>Contains modified Copernicus Sentinel data 2023. Static,
+      dependency-free dashboard generated from committed public data
+      products.</p>
+  </footer>
+
+  <script>
+    (function () {
+      "use strict";
+      var status = document.getElementById("kpi-status");
+      var source = document.body.getAttribute("data-dashboard");
+      var required = [
+        "field_count", "total_area_ha", "dominant_crop_2023", "mean_ndvi",
+        "ndvi_coverage_pct", "scene_date", "t2m_anomaly_2023_c",
+        "precip_2023_mm", "mean_organic_matter_pct", "mean_ph",
+        "mean_cec_cmol_kg", "mean_carbon_storage_mg_c_ha"
+      ];
+
+      function validate(data) {
+        if (!data || typeof data !== "object") {
+          throw new Error("invalid dashboard payload");
+        }
+        required.forEach(function (key) {
+          var value = data[key];
+          if (value === undefined || value === null) {
+            throw new Error("missing KPI: " + key);
+          }
+          if (typeof value === "number" && !isFinite(value)) {
+            throw new Error("non-finite KPI: " + key);
+          }
+        });
+      }
+
+      function format(value) {
+        if (typeof value === "number") {
+          return new Intl.NumberFormat("en-US", {
+            maximumFractionDigits: 3
+          }).format(value);
+        }
+        return String(value);
+      }
+
+      function render(data) {
+        document.querySelectorAll("[data-kpi]").forEach(function (target) {
+          var key = target.getAttribute("data-kpi");
+          target.textContent = format(data[key]);
+        });
+        status.textContent = "Dashboard data loaded.";
+      }
+
+      fetch(source)
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error("load failed");
+          }
+          return response.json();
+        })
+        .then(function (data) {
+          validate(data);
+          render(data);
+        })
+        .catch(function () {
+          status.textContent = "Dashboard data could not be loaded. Please reload the page to try again.";
+        });
+    }());
+  </script>
+</body>
+</html>

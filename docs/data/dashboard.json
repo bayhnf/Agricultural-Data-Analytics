@@ -1,0 +1,57 @@
+{
+  "dominant_crop_2023": "Corn",
+  "field_count": 25,
+  "mean_carbon_storage_mg_c_ha": 97.52984007805026,
+  "mean_cec_cmol_kg": 22.38932399036181,
+  "mean_ndvi": 0.941799963188208,
+  "mean_organic_matter_pct": 4.73697026656548,
+  "mean_ph": 6.433874181377371,
+  "ndvi_coverage_pct": 100.0,
+  "precip_2023_mm": 627.62,
+  "scene_date": "2023-06-20",
+  "sources": {
+    "crops": {
+      "name": "Cropland Data Layer, Story County, Iowa",
+      "organization": "USDA National Agricultural Statistics Service",
+      "version": "2020-2023"
+    },
+    "fields": {
+      "name": "Iowa Field Boundaries 2019 (ACPF)",
+      "organization": "USDA Agricultural Research Service",
+      "version": "2019"
+    },
+    "ndvi": {
+      "date": "2023-06-20",
+      "license_note": "Contains modified Copernicus Sentinel data 2023",
+      "name": "Sentinel-2 Level-2A surface reflectance",
+      "organization": "European Space Agency Copernicus Programme",
+      "version": "S2B_15TVG_20230620_0_L2A"
+    },
+    "soil": {
+      "name": "SSURGO Soil Survey Area IA169, Story County, Iowa",
+      "organization": "USDA Natural Resources Conservation Service",
+      "version": "2025-09-09 snapshot"
+    },
+    "units": {
+      "dominant_crop_2023": "crop name by largest 2023 valid-pixel area",
+      "field_count": "fields",
+      "mean_carbon_storage_mg_c_ha": "Mg C/ha",
+      "mean_cec_cmol_kg": "cmol(+)/kg",
+      "mean_ndvi": "unitless NDVI (-1 to 1)",
+      "mean_organic_matter_pct": "%",
+      "mean_ph": "pH units",
+      "ndvi_coverage_pct": "% of field pixels",
+      "precip_2023_mm": "mm, 2023 total",
+      "scene_date": "YYYY-MM-DD",
+      "t2m_anomaly_2023_c": "\u00b0C, 2023 vs 1991-2020 daily baseline",
+      "total_area_ha": "ha"
+    },
+    "weather": {
+      "name": "POWER daily point data (T2M, PRECTOTCORR)",
+      "organization": "NASA Langley Research Center",
+      "version": "1991-2023"
+    }
+  },
+  "t2m_anomaly_2023_c": 1.824059360730594,
+  "total_area_ha": 787.8738891056054
+}
