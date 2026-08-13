@@ -268,6 +268,80 @@ class ExtractionTest(unittest.TestCase):
             self.assertEqual(first.read_bytes(), b"payload")
 
 
+class ExtractionFreshnessTest(unittest.TestCase):
+    SPATIAL_SUFFIXES = (".dbf", ".prj", ".shp", ".shx")
+
+    def _write_ssurgo_zip(self, path: Path, muname: str) -> None:
+        spatial = path.parent / "_spatial_build"
+        spatial.mkdir(parents=True, exist_ok=True)
+        gpd.GeoDataFrame(
+            {"MUKEY": ["123456"],
+             "geometry": [box(-93.7, 41.9, -93.5, 42.1)]},
+            crs=4326,
+        ).to_file(spatial / "soilmu_a_ia169.shp")
+        members = {
+            "IA169/tabular/mstabcol.txt": MAPUNIT_METADATA.encode(),
+            "IA169/tabular/mapunit.txt":
+                f'"L1"|"{muname}"|"123456"\n'.encode(),
+        }
+        for suffix in self.SPATIAL_SUFFIXES:
+            member = f"IA169/spatial/soilmu_a_ia169{suffix}"
+            members[member] = (spatial / f"soilmu_a_ia169{suffix}").read_bytes()
+        make_zip(path, members)
+
+    def _write_fields(self, path: Path) -> None:
+        rows = []
+        for number in range(1, 26):
+            geometry = (box(-93.7, 41.9, -93.5, 42.1) if number == 1
+                        else box(0, 0, 0.001, 0.001))
+            rows.append({"field_id": f"STORY-{number:02d}",
+                         "geometry": geometry})
+        gpd.GeoDataFrame(rows, crs=4326).to_file(path, driver="GeoJSON")
+
+    def test_fresh_archive_forces_replacement_of_stale_extraction(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ssurgo_dir = root / "ssurgo"
+            extract_dir = ssurgo_dir / "IA169"
+            stale_zip = root / "stale.zip"
+            self._write_ssurgo_zip(stale_zip, "Stale loam")
+            with zipfile.ZipFile(stale_zip) as archive:
+                for member in REQUIRED_MEMBERS:
+                    archive.extract(member, extract_dir)
+            zip_path = ssurgo_dir / ARCHIVE_NAME
+            self._write_ssurgo_zip(zip_path, "Fresh loam")
+            fields_path = root / "fields.geojson"
+            self._write_fields(fields_path)
+            output_dir = root / "out"
+            provenance_dir = root / "prov"
+            with mock.patch.object(
+                    assignment_module, "_acquire_archive",
+                    return_value=(zip_path, "d" * 64,
+                                  "2026-01-01T00:00:00+00:00", False)):
+                assignment_module.build_field_soil_mapping(
+                    root, fields_path, output_dir, provenance_dir)
+            extracted = (extract_dir / "IA169/tabular/mapunit.txt"
+                         ).read_text()
+            self.assertIn("Fresh loam", extracted)
+            self.assertNotIn("Stale loam", extracted)
+
+    def test_complete_extraction_is_reused_when_not_forced(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            zip_path = root / ARCHIVE_NAME
+            make_zip(zip_path, valid_members())
+            extract_dir = root / "IA169"
+            assignment_module._ensure_extracted(zip_path, extract_dir)
+            original = (extract_dir / "IA169/tabular/mapunit.txt"
+                        ).read_bytes()
+            make_zip(zip_path, {name: b"DIFFERENT"
+                                for name in REQUIRED_MEMBERS})
+            assignment_module._ensure_extracted(zip_path, extract_dir)
+            self.assertEqual(
+                (extract_dir / "IA169/tabular/mapunit.txt").read_bytes(),
+                original)
+
+
 class CommittedOutputTest(unittest.TestCase):
     OVERLAP = Path("data/processed/assignment-04/field_soil_overlap.csv")
     SOILS = Path("data/processed/assignment-04/soil_map_units.geojson")

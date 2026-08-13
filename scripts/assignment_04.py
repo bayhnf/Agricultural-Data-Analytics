@@ -164,11 +164,13 @@ def _acquire_archive(raw_dir: Path
     return zip_path, digest, retrieved, cached
 
 
-def _ensure_extracted(zip_path: Path, extract_dir: Path) -> None:
-    """Extract required members, replacing any incomplete extraction."""
+def _ensure_extracted(zip_path: Path, extract_dir: Path,
+                       force: bool = False) -> None:
+    """Extract required members, replacing incomplete or stale extraction."""
     extract_dir = Path(extract_dir)
     required = [extract_dir / Path(member) for member in REQUIRED_MEMBERS]
-    if all(path.is_file() and path.stat().st_size > 0 for path in required):
+    if not force and all(path.is_file() and path.stat().st_size > 0
+                         for path in required):
         return
     staging = Path(str(extract_dir) + ".tmp")
     shutil.rmtree(staging, ignore_errors=True)
@@ -195,7 +197,7 @@ def build_field_soil_mapping(raw_dir: Path, fields_path: Path,
 
     zip_path, digest, retrieved, cached = _acquire_archive(ssurgo_dir)
     extract_dir = ssurgo_dir / "IA169"
-    _ensure_extracted(zip_path, extract_dir)
+    _ensure_extracted(zip_path, extract_dir, force=not cached)
 
     columns = parse_mapunit_column_order(
         (extract_dir / "IA169/tabular/mstabcol.txt").read_text(
