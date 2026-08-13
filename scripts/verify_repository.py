@@ -25,9 +25,9 @@ CREDENTIAL_PATTERNS = (
     (re.compile(r"ghp_[A-Za-z0-9]{20,}"), "GitHub classic PAT"),
     (re.compile(r"github_pat_[A-Za-z0-9_]{20,}"), "GitHub fine-grained PAT"),
     (re.compile(r"GOCSPX-[A-Za-z0-9_-]{10,}"), "Google OAuth client secret"),
-    (re.compile(r"refresh_token[\"']?\s*[:=]\s*[\"'][^\"']{8,}[\"']"),
+    (re.compile(r"refresh_token[\"']?\s*[:=]\s*(?:[\"'][^\"']{8,}[\"']|[A-Za-z0-9._~+/-]{8,})"),
      "assigned refresh_token"),
-    (re.compile(r"client_secret[\"']?\s*[:=]\s*[\"'][^\"']{8,}[\"']"),
+    (re.compile(r"client_secret[\"']?\s*[:=]\s*(?:[\"'][^\"']{8,}[\"']|[A-Za-z0-9._~+/-]{8,})"),
      "assigned client_secret"),
 )
 

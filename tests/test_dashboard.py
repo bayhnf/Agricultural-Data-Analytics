@@ -258,6 +258,27 @@ def parse_page() -> PageParser:
     return parser
 
 
+class LedeParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.lede_text: list[str] = []
+        self._depth = 0
+
+    def handle_starttag(self, tag: str,
+                        attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        if tag == "p" and "lede" in (values.get("class") or "").split():
+            self._depth = 1
+
+    def handle_data(self, data: str) -> None:
+        if self._depth:
+            self.lede_text.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "p" and self._depth:
+            self._depth = 0
+
+
 class RepositoryVerifierTest(unittest.TestCase):
     def test_untracked_secrets_are_ignored(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -359,6 +380,25 @@ class RepositoryVerifierTest(unittest.TestCase):
                             "data/dashboard.json"):
                 self.assertIn(missing, combined, missing)
 
+    def test_unquoted_assigned_secrets_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            run_git(root, "init", "-q")
+            token_value = "abcdefgh1234"
+            secret_value = "opaquestring"
+            (root / "config.ini").write_text(
+                "refresh_token: %s\n"
+                "client_secret = %s\n" % (token_value, secret_value),
+                encoding="utf-8")
+            run_git(root, "add", "config.ini")
+            result = verify_repository.verify(root)
+            self.assertTrue(result.findings)
+            combined = "\n".join(result.findings)
+            self.assertNotIn(token_value, combined)
+            self.assertNotIn(secret_value, combined)
+            self.assertIn("refresh_token", combined)
+            self.assertIn("client_secret", combined)
+
     def test_real_repository_verifies_clean(self):
         with contextlib.redirect_stdout(io.StringIO()) as output:
             code = verify_repository.main(root=ROOT)
@@ -432,6 +472,15 @@ class DashboardPageTest(unittest.TestCase):
             "Census",
         ):
             self.assertIn(phrase, text, phrase)
+
+    def test_lede_has_no_hardcoded_kpi_values(self):
+        parser = LedeParser()
+        parser.feed((ROOT / "docs/index.html").read_text(encoding="utf-8"))
+        lede = re.sub(r"\s+", " ", " ".join(parser.lede_text)).strip()
+        self.assertIn("Story County, Iowa", lede)
+        self.assertNotRegex(lede, r"\b25\b")
+        self.assertNotIn("June 20, 2023", lede)
+        self.assertNotIn("2023-06-20", lede)
 
     def test_css_focus_styling_and_mobile_breakpoint(self):
         css = (ROOT / "docs/styles.css").read_text(encoding="utf-8")
