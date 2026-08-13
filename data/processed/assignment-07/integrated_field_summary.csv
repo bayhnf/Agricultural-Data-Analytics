@@ -1,0 +1,26 @@
+field_id,crop_2023_name,dominant_soil,dominant_soil_name,dominant_soil_mukey,dominant_soil_overlap_area_ha,mean_ndvi,valid_pixel_count,total_pixel_count,ndvi_coverage_fraction
+STORY-01,Soybeans,388,"Kossuth silty clay loam, 0 to 2 percent slopes",411315,6.4042505524114555,0.9365310014183283,1338,1338,1.0
+STORY-02,Soybeans,95,"Harps clay loam, 0 to 2 percent slopes",411346,13.628296267204728,0.9426039875644808,5023,5023,1.0
+STORY-03,Corn,259,"Biscay clay loam, 0 to 2 percent slopes",411305,30.49909460895622,1.0,7531,7531,1.0
+STORY-04,Soybeans,L138B,"Clarion loam, Bemis moraine, 2 to 6 percent slopes",2765537,6.203053216353234,0.9053650379122536,1580,1580,1.0
+STORY-05,Soybeans,L507,"Canisteo clay loam, Bemis moraine, 0 to 2 percent slopes",2922031,9.29546343433122,0.7612902362001693,3095,3095,1.0
+STORY-06,Soybeans,L107,"Webster clay loam, Bemis moraine, 0 to 2 percent slopes",2835021,5.051031110953521,0.9832827522482942,1489,1489,1.0
+STORY-07,Corn,138B,"Clarion loam, 2 to 6 percent slopes",2765547,15.5392811356026,0.9999150874439174,3576,3576,1.0
+STORY-08,Soybeans,L55,"Nicollet loam, 1 to 3 percent slopes",2800480,7.562978673985798,0.8766751477209969,2443,2443,1.0
+STORY-09,Soybeans,L138C2,"Clarion loam, Bemis moraine, 6 to 10 percent slopes, moderately eroded",2877334,3.4181927371510485,0.8100790963918512,758,758,1.0
+STORY-10,Soybeans,L107,"Webster clay loam, Bemis moraine, 0 to 2 percent slopes",2835021,23.98168544236403,0.9856972047579692,6224,6224,1.0
+STORY-11,Soybeans,536,"Hanlon fine sandy loam, 0 to 2 percent slopes",411329,8.750147069241976,0.953669788716813,1331,1331,1.0
+STORY-12,Corn,L138B,"Clarion loam, Bemis moraine, 2 to 6 percent slopes",2765537,11.9617991160856,0.9846905615364216,3128,3128,1.0
+STORY-13,Soybeans,L138B,"Clarion loam, Bemis moraine, 2 to 6 percent slopes",2765537,8.090539537530395,0.9635810110031408,2244,2244,1.0
+STORY-14,Corn,L107,"Webster clay loam, Bemis moraine, 0 to 2 percent slopes",2835021,9.461303175853653,0.9991744736171946,2933,2933,1.0
+STORY-15,Corn,L107,"Webster clay loam, Bemis moraine, 0 to 2 percent slopes",2835021,5.5452365962535,1.0,1949,1949,1.0
+STORY-16,Corn,L107,"Webster clay loam, Bemis moraine, 0 to 2 percent slopes",2835021,17.787297961381668,0.9995749202975558,4705,4705,1.0
+STORY-17,Soybeans,54,"Zook silty clay loam, 0 to 2 percent slopes, occasionally flooded",411330,12.640756876121015,0.7721275111779015,2966,2966,1.0
+STORY-18,Corn,L138C2,"Clarion loam, Bemis moraine, 6 to 10 percent slopes, moderately eroded",2877334,4.959251248706294,0.9997096367914792,1751,1751,1.0
+STORY-19,Corn,L107,"Webster clay loam, Bemis moraine, 0 to 2 percent slopes",2835021,12.682617382526216,0.9999423612331256,3518,3518,1.0
+STORY-20,Corn,L138B,"Clarion loam, Bemis moraine, 2 to 6 percent slopes",2765537,20.5175702087197,0.999980997900508,4483,4483,1.0
+STORY-21,Corn,L107,"Webster clay loam, Bemis moraine, 0 to 2 percent slopes",2835021,10.738873258614802,0.999996036182928,3203,3203,1.0
+STORY-22,Soybeans,L138B,"Clarion loam, Bemis moraine, 2 to 6 percent slopes",2765537,9.798683323876752,0.8722475925019512,1664,1664,1.0
+STORY-23,Soybeans,L138B,"Clarion loam, Bemis moraine, 2 to 6 percent slopes",2765537,21.459084100085597,0.8713939808362768,6189,6189,1.0
+STORY-24,Corn,L138B,"Clarion loam, Bemis moraine, 2 to 6 percent slopes",2765537,15.51493681607652,0.9939716096541692,2971,2971,1.0
+STORY-25,Soybeans,L55,"Nicollet loam, 1 to 3 percent slopes",2800480,10.861272894390968,0.9334990465974736,2640,2640,1.0
