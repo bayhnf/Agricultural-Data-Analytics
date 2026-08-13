@@ -1,0 +1,31 @@
+{
+  "analysis_crs": "EPSG:5070",
+  "archive_name": "wss_SSA_IA169_[2025-09-09].zip",
+  "counts": {
+    "archive_members": 97,
+    "cache_used": true,
+    "csv_rows": 165,
+    "fields": 25,
+    "mapunit_table_rows": 86,
+    "overlap_rows": 165,
+    "overlapping_mapunits": 47,
+    "shapefile_features": 39591,
+    "soil_features": 47,
+    "unique_mapunits": 86
+  },
+  "dataset": "ssurgo_soil_map_units",
+  "license_note": "SSURGO soil data are produced and maintained by the USDA Natural Resources Conservation Service (NRCS). SSURGO maps are designed for interpretations at scales from about 1:12,000 to 1:63,360 and are not intended for site-specific or larger-scale interpretations. Credit the USDA NRCS as the source of the soil data in products derived from these data.",
+  "output_crs": "EPSG:4326",
+  "producer": "scripts/assignment_04.py",
+  "retrieved_utc": "2026-08-13T13:44:58.704417+00:00",
+  "sha256": {
+    "data/raw/ssurgo/wss_SSA_IA169_[2025-09-09].zip": "43d52a9ceda5b332ce3cd3230426bcd38990d2175478dfd22f6bf30140482cd7"
+  },
+  "snapshot_date": "2025-09-09",
+  "source_crs": "EPSG:4326",
+  "source_name": "Soil Survey Geographic Database (SSURGO), Soil Survey Area IA169 (Story County, Iowa)",
+  "source_organization": "USDA Natural Resources Conservation Service (NRCS)",
+  "source_urls": [
+    "https://websoilsurvey.sc.egov.usda.gov/DSD/Download/Cache/SSA/wss_SSA_IA169_%5B2025-09-09%5D.zip"
+  ]
+}
