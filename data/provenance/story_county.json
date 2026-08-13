@@ -1,0 +1,21 @@
+{
+  "counts": {
+    "cache_used": true,
+    "features": 1
+  },
+  "dataset": "story_county_boundary",
+  "license_note": "U.S. Census Bureau TIGER/Line data are U.S. Government work and are in the public domain.",
+  "output_crs": "EPSG:4326",
+  "producer": "scripts/assignment_02.py",
+  "retrieved_utc": "2026-08-13T12:05:44.919667+00:00",
+  "sha256": {
+    "data/raw/story_county.geojson": "42fe8a96eb1012d4cdc4aebdc8cff141afaf840906b71eb2092ed0752e90cd3c"
+  },
+  "source_crs": "EPSG:4326",
+  "source_name": "TIGERweb State_County boundary, Story County, Iowa",
+  "source_organization": "U.S. Census Bureau",
+  "source_urls": [
+    "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/1/query?where=GEOID%3D%2719169%27&outFields=GEOID%2CNAME&returnGeometry=true&f=geojson"
+  ],
+  "source_version": "TIGERweb State_County MapServer layer 1 snapshot"
+}
