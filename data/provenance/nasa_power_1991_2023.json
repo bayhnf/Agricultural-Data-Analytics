@@ -1,0 +1,38 @@
+{
+  "counts": {
+    "anomaly_rows_2023": 365,
+    "daily_rows": 12053,
+    "fields": 25
+  },
+  "dataset": "nasa_power_weather",
+  "license_note": "NASA POWER T2M and PRECTOTCORR are gridded assimilated estimates provided by the NASA Langley Research Center POWER Project, not station observations.",
+  "output_crs": "EPSG:4326",
+  "producer": "scripts/assignment_06.py",
+  "request": {
+    "community": "AG",
+    "end": "20231231",
+    "format": "JSON",
+    "latitude": 42.037083,
+    "longitude": -93.454655,
+    "parameters": [
+      "T2M",
+      "PRECTOTCORR"
+    ],
+    "start": "19910101"
+  },
+  "retrieved_utc": "2026-08-13T17:25:19.267029+00:00",
+  "sha256": {
+    "data/raw/nasa_power/nasa_power_1991_2023.json": "e535e6599eb1b6bf396efa3bc6a3b31194140af3f90f34db02989e9ecdbea0b8"
+  },
+  "source_crs": "EPSG:4326",
+  "source_name": "NASA POWER daily point data (T2M, PRECTOTCORR)",
+  "source_organization": "NASA Langley Research Center",
+  "source_urls": [
+    "https://power.larc.nasa.gov/api/temporal/daily/point"
+  ],
+  "source_version": "POWER daily point API",
+  "units": {
+    "PRECTOTCORR": "mm/day",
+    "T2M": "C"
+  }
+}
