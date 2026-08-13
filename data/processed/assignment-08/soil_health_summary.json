@@ -1,0 +1,43 @@
+{
+  "depth_limit_cm": 30,
+  "field_count": 25,
+  "interpretation": "Field values are soil screening estimates from generalized SSURGO mapunit, component, and horizon data; they are not a farm recommendation.",
+  "metrics": {
+    "carbon_storage_mg_c_ha": {
+      "mean": 97.52984007805026,
+      "mean_coverage_fraction": 0.9999908498003726,
+      "median": 100.6469219374376,
+      "non_null_fields": 25,
+      "unit": "Mg C/ha"
+    },
+    "cec_cmol_kg": {
+      "mean": 22.38932399036181,
+      "mean_coverage_fraction": 0.9999908498003726,
+      "median": 22.648138316328108,
+      "non_null_fields": 25,
+      "unit": "cmol(+)/kg"
+    },
+    "erosion_k_factor": {
+      "mean": 0.2717862212540064,
+      "mean_coverage_fraction": 0.9968510636741423,
+      "median": 0.27425706971694797,
+      "non_null_fields": 25,
+      "unit": "dimensionless K factor"
+    },
+    "organic_matter_pct": {
+      "mean": 4.73697026656548,
+      "mean_coverage_fraction": 0.9999908498003726,
+      "median": 4.954391947643182,
+      "non_null_fields": 25,
+      "unit": "%"
+    },
+    "ph_h2o": {
+      "mean": 6.433874181377371,
+      "mean_coverage_fraction": 0.9999908498003726,
+      "median": 6.420678680090053,
+      "non_null_fields": 25,
+      "unit": "pH units"
+    }
+  },
+  "source": "USDA NRCS SSURGO IA169 snapshot 2025-09-09"
+}
