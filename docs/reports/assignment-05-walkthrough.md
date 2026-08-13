@@ -81,6 +81,11 @@ Low-signal surface reflectance can produce out-of-range ratios after offset
 application, which is why finite NDVI is explicitly clipped to its physical
 range.
 
+The committed field summary has 3 of 25 field means and 17 of 25 field medians
+pinned at exactly 1.0 after clipping. These saturated fields reach the
+dense-canopy ceiling of the NDVI formula and should be treated as "at or above"
+ceiling values rather than as precise, rankable measurements within that group.
+
 ## Attribution
 
 Contains modified Copernicus Sentinel data (2023), processed by ESA and

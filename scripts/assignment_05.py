@@ -143,6 +143,21 @@ def stac_search_payload(bounds) -> dict:
     }
 
 
+def _assert_stac_complete(payload: dict, features: list[dict]) -> None:
+    """Reject truncated responses rather than sorting an incomplete catalog."""
+    context = payload.get("context")
+    matched = context.get("matched") if isinstance(context, dict) else None
+    if matched is not None:
+        if int(matched) > len(features):
+            raise ValueError(
+                f"Earth Search response is truncated: {matched} matched but "
+                f"only {len(features)} features returned")
+        return
+    if any(link.get("rel") == "next" for link in payload.get("links") or []):
+        raise ValueError(
+            "Earth Search response is paginated; expected one complete page")
+
+
 def query_candidates(fields: gpd.GeoDataFrame) -> list[dict]:
     response = requests.post(
         EARTH_SEARCH_URL,
@@ -154,6 +169,7 @@ def query_candidates(fields: gpd.GeoDataFrame) -> list[dict]:
     features = payload.get("features")
     if not isinstance(features, list) or not features:
         raise ValueError("Earth Search returned no Sentinel-2 candidates")
+    _assert_stac_complete(payload, features)
     for feature in features:
         missing = set(ASSET_NAMES) - set(feature.get("assets", {}))
         if missing:

@@ -2,16 +2,26 @@ import csv
 import json
 import math
 import pathlib
+import tempfile
 import unittest
 
+import geopandas as gpd
 import numpy as np
+import rasterio
+from rasterio.crs import CRS
+from rasterio.transform import from_origin
+from shapely.geometry import box
+
+import scripts.assignment_05 as assignment_05
 
 from scripts.assignment_05 import (
     DATE_RANGE,
     MINIMUM_VALID_FRACTION,
+    _reproject_scl,
     calculate_ndvi,
     candidate_sort_key,
     raster_data_mask,
+    read_asset_window,
     select_scene_candidate,
     sort_candidates,
     stac_search_payload,
@@ -238,6 +248,122 @@ class CommittedOutputContractTest(unittest.TestCase):
             "docs/assets/ndvi_map.png",
         ):
             self.assertGreater((ROOT / relative).stat().st_size, 1000)
+
+
+class StacCompletenessTest(unittest.TestCase):
+    def setUp(self):
+        self._original_post = assignment_05.requests.post
+
+    def tearDown(self):
+        assignment_05.requests.post = self._original_post
+
+    @staticmethod
+    def _fields():
+        return gpd.GeoDataFrame(
+            geometry=[box(0, 0, 1, 1)], crs="EPSG:4326")
+
+    def _post_returning(self, payload):
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return payload
+
+        assignment_05.requests.post = (
+            lambda url, json=None, timeout=None: FakeResponse())
+
+    @staticmethod
+    def _candidate():
+        candidate = feature("a", "2023-07-01T00:00:00Z", 1.0)
+        candidate["assets"] = {
+            name: {"href": f"https://example.invalid/{name}.tif"}
+            for name in ("red", "nir", "scl")
+        }
+        return candidate
+
+    def test_truncated_matched_is_rejected(self):
+        self._post_returning({
+            "features": [self._candidate()],
+            "context": {"matched": 2, "returned": 1},
+        })
+        with self.assertRaisesRegex(ValueError, "truncated"):
+            assignment_05.query_candidates(self._fields())
+
+    def test_rel_next_link_is_rejected(self):
+        self._post_returning({
+            "features": [self._candidate()],
+            "links": [{"rel": "next", "href": "https://example.invalid"}],
+        })
+        with self.assertRaisesRegex(ValueError, "paginated"):
+            assignment_05.query_candidates(self._fields())
+
+    def test_redundant_next_is_allowed_when_context_is_complete(self):
+        self._post_returning({
+            "features": [self._candidate()],
+            "context": {"matched": 1, "returned": 1},
+            "links": [{"rel": "next", "href": "https://example.invalid"}],
+        })
+        self.assertEqual(
+            [item["id"] for item in
+             assignment_05.query_candidates(self._fields())],
+            ["a"],
+        )
+
+
+class ReadAssetWindowTest(unittest.TestCase):
+    def test_rejects_raster_not_covering_every_field(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            raw_dir = pathlib.Path(tmp) / "raw"
+            raster_path = raw_dir / "small.tif"
+            raster_path.parent.mkdir(parents=True, exist_ok=True)
+            with rasterio.open(
+                raster_path,
+                "w",
+                driver="GTiff",
+                width=10,
+                height=10,
+                count=1,
+                dtype="uint8",
+                crs="EPSG:4326",
+                transform=from_origin(0, 10, 1, 1),
+            ) as target:
+                target.write(np.zeros((10, 10), dtype="uint8"), 1)
+
+            fields = gpd.GeoDataFrame(
+                geometry=[box(5, 5, 20, 20)], crs="EPSG:4326")
+            feature_with_asset = {
+                "id": "small",
+                "assets": {"red": {"href": raster_path.as_posix()}},
+            }
+
+            with self.assertRaisesRegex(ValueError, "does not cover every"):
+                read_asset_window(
+                    feature_with_asset, "red", fields, raw_dir)
+
+
+class ReprojectSclTest(unittest.TestCase):
+    def test_nearest_neighbor_preserves_categorical_classes(self):
+        crs = CRS.from_epsg(3857)
+        scl = {
+            "array": np.array([[4, 5], [6, 7]], dtype="uint8"),
+            "transform": from_origin(0, 40, 20, 20),
+            "crs": crs,
+            "nodata": 0,
+        }
+        target = {
+            "array": np.zeros((4, 4), dtype="uint8"),
+            "transform": from_origin(0, 40, 10, 10),
+            "crs": crs,
+        }
+        result = _reproject_scl(scl, target)
+        expected = np.array([
+            [4, 4, 5, 5],
+            [4, 4, 5, 5],
+            [6, 6, 7, 7],
+            [6, 6, 7, 7],
+        ], dtype="uint8")
+        np.testing.assert_array_equal(result, expected)
 
 
 if __name__ == "__main__":
