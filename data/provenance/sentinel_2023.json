@@ -1,0 +1,35 @@
+{
+  "counts": {
+    "cache_used": {
+      "nir": true,
+      "red": true,
+      "scl": true
+    },
+    "candidates_rejected": 0,
+    "candidates_returned": 36,
+    "csv_rows": 25,
+    "fields": 25,
+    "study_area_total_pixels": 78732,
+    "study_area_valid_pixels": 78732
+  },
+  "dataset": "sentinel_2_field_ndvi",
+  "license_note": "Contains modified Copernicus Sentinel data (2023), processed by ESA and accessed through the Element 84 Earth Search public-data catalog.",
+  "output_crs": "not applicable (scalar field summaries keyed by field_id)",
+  "producer": "scripts/assignment_05.py",
+  "retrieved_utc": "2026-08-13T16:21:37.355267+00:00",
+  "sha256": {
+    "data/raw/sentinel/S2B_15TVG_20230620_0_L2A_nir.tif": "754307e60d15d29cb39931334455fae022bca17525ad6593c695be88004b8e8d",
+    "data/raw/sentinel/S2B_15TVG_20230620_0_L2A_red.tif": "7e8b648361362f239fbba9f62a7232b53670744339bfb0c824d9c5d9ecea2f7e",
+    "data/raw/sentinel/S2B_15TVG_20230620_0_L2A_scl.tif": "04b9f96860fd709a031ed2e0a8a940de6d39c4119a681b01c7a446b38618d7e0"
+  },
+  "source_crs": "EPSG:32615",
+  "source_name": "Sentinel-2 Level-2A surface reflectance",
+  "source_organization": "European Space Agency Copernicus Programme, catalogued by Element 84",
+  "source_urls": [
+    "https://earth-search.aws.element84.com/v1/search",
+    "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/15/T/VG/2023/6/S2B_15TVG_20230620_0_L2A/B04.tif",
+    "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/15/T/VG/2023/6/S2B_15TVG_20230620_0_L2A/B08.tif",
+    "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/15/T/VG/2023/6/S2B_15TVG_20230620_0_L2A/SCL.tif"
+  ],
+  "source_version": "S2B_15TVG_20230620_0_L2A"
+}
