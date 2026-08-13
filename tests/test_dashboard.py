@@ -407,6 +407,28 @@ class RepositoryVerifierTest(unittest.TestCase):
         self.assertIn("tracked files", text)
         self.assertIn("references", text)
 
+    def test_tracked_machine_local_absolute_path_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            run_git(root, "init", "-q")
+            leaked = "/" + "home/" + "alice/projects/sample/docs/assets/field.png"
+            (root / "artifact.md").write_text(
+                f"wrote {leaked}\n",
+                encoding="utf-8")
+            run_git(root, "add", "artifact.md")
+            result = verify_repository.verify(root)
+            self.assertTrue(result.findings)
+            combined = "\n".join(result.findings)
+            self.assertIn("machine-local absolute path", combined)
+            self.assertNotIn(leaked, combined)
+
+    def test_real_repository_notebook_output_has_no_machine_path(self):
+        notebook = ROOT / "notebooks/04_field_mapping.ipynb"
+        self.assertNotRegex(
+            notebook.read_text(encoding="utf-8"),
+            r"wrote /(?:home|Users)/",
+        )
+
 
 class DashboardPageTest(unittest.TestCase):
     def test_page_structure_and_accessibility(self):

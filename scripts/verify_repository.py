@@ -32,6 +32,15 @@ CREDENTIAL_PATTERNS = (
 )
 
 
+# Absolute Unix home/root paths embed the developer's machine in public
+# artifacts; docs/superpowers/ planning prose may intentionally reference a
+# local tooling path and is therefore exempt from this privacy check.
+MACHINE_LOCAL_PATH_PATTERNS = (
+    (re.compile(r"/(?:home|Users)/[^\s\"\'`\\]+"), "machine-local absolute path"),
+)
+MACHINE_LOCAL_PATH_ALLOWED_PREFIXES = ("docs/superpowers/",)
+
+
 @dataclass
 class ScanResult:
     tracked_count: int = 0
@@ -76,6 +85,12 @@ def scan_tracked_file(root: Path, relative: str) -> list[str]:
             findings.append(
                 f"privacy: tracked file '{relative}' contains a "
                 f"{label} (value redacted); rotate and remove it")
+    if not relative.startswith(MACHINE_LOCAL_PATH_ALLOWED_PREFIXES):
+        for pattern, label in MACHINE_LOCAL_PATH_PATTERNS:
+            if pattern.search(content):
+                findings.append(
+                    f"privacy: tracked file '{relative}' contains a "
+                    f"{label} (value redacted); normalize to a portable path")
     return findings
 
 
