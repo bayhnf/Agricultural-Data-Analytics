@@ -17,10 +17,13 @@ FIELD_COUNT = 25
 INPUT_RELATIVE_PATHS = {
     "field_summary": "data/processed/assignment-02/field_summary.csv",
     "crops": "data/processed/assignment-02/cdl_EPSG4326.csv",
+    "geojson": "data/processed/assignment-02/fields_EPSG4326.geojson",
     "ndvi": "data/processed/assignment-05/field_ndvi.csv",
     "scene": "data/processed/assignment-05/scene.json",
     "weather": "data/processed/assignment-06/weather_summary.json",
+    "integration": "data/processed/assignment-07/integrated_field_summary.csv",
     "soil": "data/processed/assignment-08/soil_health_summary.json",
+    "soil_rows": "data/processed/assignment-08/soil_health_by_field.csv",
 }
 
 SOIL_METRICS = {
@@ -97,22 +100,24 @@ def require_inputs(root: Path) -> dict[str, Path]:
             for name, relative in INPUT_RELATIVE_PATHS.items()}
 
 
-def require_field_rows(frame: pd.DataFrame, label: str) -> None:
-    if len(frame) != FIELD_COUNT:
+def require_field_frame(frame: pd.DataFrame, expected: set[str],
+                        label: str) -> None:
+    ids = frame["field_id"]
+    unique = set(ids.dropna())
+    if (len(frame) != FIELD_COUNT or bool(ids.isna().any())
+            or len(unique) != FIELD_COUNT or unique != expected):
         raise ValueError(
-            f"{label}: expected {FIELD_COUNT} rows, found {len(frame)}")
-    field_ids = frame["field_id"]
-    if (field_ids.isna().any() or field_ids.duplicated().any()
-            or field_ids.nunique() != FIELD_COUNT):
-        raise ValueError(
-            f"{label}: expected {FIELD_COUNT} unique field ids")
+            f"{label}: field ids do not match the 25-field reference set")
 
 
-def require_finite_column(frame: pd.DataFrame, label: str,
-                          column: str) -> None:
+def require_finite_column(frame: pd.DataFrame, label: str, column: str,
+                          integral: bool = False) -> None:
     values = pd.to_numeric(frame[column], errors="raise")
     if not values.map(math.isfinite).all():
         raise ValueError(f"{label}: non-finite {column} values")
+    if integral and not bool(frame[column].map(
+            lambda value: float(value).is_integer()).all()):
+        raise ValueError(f"{label}: non-integral {column} values")
 
 
 def dominant_crop_2023(crops_2023: pd.DataFrame) -> str:
@@ -157,15 +162,34 @@ def build_payload(root: Path = ROOT) -> dict:
         raise ValueError("field_summary.csv reports duplicate field ids")
     total_area_ha = float(summary.loc[0, "total_area_ha"])
 
+    geojson = json.loads(paths["geojson"].read_text(encoding="utf-8"))
+    geojson_features: dict[str, dict] = {}
+    for feature in geojson.get("features", []):
+        properties = feature.get("properties") or {}
+        field_id = properties.get("field_id")
+        if not isinstance(field_id, str) or not field_id:
+            raise ValueError("geojson: missing field_id property")
+        if field_id in geojson_features:
+            raise ValueError(f"geojson: duplicate field id {field_id}")
+        if "area_ha" not in properties or not math.isfinite(
+                float(properties["area_ha"])):
+            raise ValueError(f"geojson: invalid area_ha for {field_id}")
+        geojson_features[field_id] = properties
+    if len(geojson_features) != FIELD_COUNT:
+        raise ValueError(
+            f"geojson: expected {FIELD_COUNT} unique field ids, "
+            f"found {len(geojson_features)}")
+    reference_ids = set(geojson_features)
+
     crops = pd.read_csv(paths["crops"])
     crops_2023 = crops.loc[crops["year"] == 2023]
-    require_field_rows(crops_2023, "cdl_EPSG4326.csv 2023")
+    require_field_frame(crops_2023, reference_ids, "cdl_EPSG4326.csv 2023")
     require_finite_column(crops_2023, "cdl_EPSG4326.csv 2023",
-                          "valid_pixels")
+                          "valid_pixels", integral=True)
     dominant = dominant_crop_2023(crops_2023)
 
     ndvi = pd.read_csv(paths["ndvi"])
-    require_field_rows(ndvi, "field_ndvi.csv")
+    require_field_frame(ndvi, reference_ids, "field_ndvi.csv")
     require_finite_column(ndvi, "field_ndvi.csv", "mean_ndvi")
     require_finite_column(ndvi, "field_ndvi.csv", "coverage_fraction")
     mean_ndvi = float(ndvi["mean_ndvi"].mean())
@@ -188,6 +212,52 @@ def build_payload(root: Path = ROOT) -> dict:
     soil_values = {key: float(soil_metrics[source]["mean"])
                    for key, source in SOIL_METRICS.items()}
 
+    integration = pd.read_csv(paths["integration"])
+    require_field_frame(integration, reference_ids,
+                         "integrated_field_summary.csv")
+    soil_rows = pd.read_csv(paths["soil_rows"])
+    require_field_frame(soil_rows, reference_ids,
+                         "soil_health_by_field.csv")
+
+    fields = []
+    indexed = {
+        "crops": crops_2023.set_index("field_id"),
+        "ndvi": ndvi.set_index("field_id"),
+        "integration": integration.set_index("field_id"),
+        "soil": soil_rows.set_index("field_id"),
+    }
+    for field_id in sorted(reference_ids):
+        crop_row = indexed["crops"].loc[field_id]
+        ndvi_row = indexed["ndvi"].loc[field_id]
+        integration_row = indexed["integration"].loc[field_id]
+        soil_row = indexed["soil"].loc[field_id]
+        properties = geojson_features[field_id]
+        record = {
+            "field_id": field_id,
+            "area_ha": float(properties["area_ha"]),
+            "crop_2023": str(crop_row["cdl_name"]),
+            "crop_2023_pixels": int(crop_row["valid_pixels"]),
+            "soil_type": str(integration_row["dominant_soil"]),
+            "soil_name": str(integration_row["dominant_soil_name"]),
+            "mean_ndvi": float(ndvi_row["mean_ndvi"]),
+            "ndvi_coverage_fraction": float(ndvi_row["coverage_fraction"]),
+            "organic_matter_pct": float(soil_row["organic_matter_pct"]),
+            "ph_h2o": float(soil_row["ph_h2o"]),
+            "cec_cmol_kg": float(soil_row["cec_cmol_kg"]),
+            "carbon_storage_mg_c_ha": float(
+                soil_row["carbon_storage_mg_c_ha"]),
+        }
+        bad = sorted(key for key, value in record.items()
+                     if isinstance(value, float)
+                     and not math.isfinite(value))
+        if bad:
+            raise ValueError(
+                f"{field_id}: non-finite values: " + ", ".join(bad))
+        for key in ("crop_2023", "soil_type", "soil_name"):
+            if not record[key] or record[key] == "nan":
+                raise ValueError(f"{field_id}: empty {key}")
+        fields.append(record)
+
     payload = {
         "field_count": field_count,
         "total_area_ha": total_area_ha,
@@ -199,6 +269,7 @@ def build_payload(root: Path = ROOT) -> dict:
         "precip_2023_mm": precip,
         **soil_values,
         "sources": build_sources(scene_id, scene_dt),
+        "fields": fields,
     }
     require_finite(payload)
     return payload
