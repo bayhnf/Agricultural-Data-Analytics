@@ -1,4 +1,4 @@
-"""Contract tests for the Task 11 dashboard (slices A and B)."""
+"""Contract tests for the Task 11 dashboard and the final project."""
 
 import contextlib
 import io
@@ -31,13 +31,14 @@ KPI_KEYS = frozenset({
     "mean_cec_cmol_kg",
     "mean_carbon_storage_mg_c_ha",
 })
-EXPECTED_KEYS = KPI_KEYS | {"sources"}
+EXPECTED_KEYS = KPI_KEYS | {"sources", "fields"}
 SOURCE_NAMES = frozenset({"fields", "crops", "ndvi", "weather", "soil",
                           "units"})
 NUMERIC_KEYS = KPI_KEYS - {"dominant_crop_2023", "scene_date"}
 REQUIRED_IMAGES = frozenset({
     "assets/field_area_distribution.png",
     "assets/crop_mix_2023.png",
+    "assets/crop_rotation_patterns.png",
     "assets/field_spatial_map.png",
     "assets/ndvi_map.png",
     "assets/weather_trends.png",
@@ -46,15 +47,30 @@ REQUIRED_IMAGES = frozenset({
 })
 SECTION_IDS = ("fields", "vegetation", "weather", "integration", "soil",
                "methods", "limitations", "provenance")
+FIELD_SCHEMA = (
+    "field_id",
+    "area_ha",
+    "crop_2023",
+    "crop_2023_pixels",
+    "soil_type",
+    "soil_name",
+    "mean_ndvi",
+    "ndvi_coverage_fraction",
+    "organic_matter_pct",
+    "ph_h2o",
+    "cec_cmol_kg",
+    "carbon_storage_mg_c_ha",
+)
+FIELD_NUMERIC = frozenset(FIELD_SCHEMA) - {"field_id", "crop_2023",
+                                           "soil_type", "soil_name"}
 
 
 def write_minimal_inputs(root: pathlib.Path) -> None:
-    """Write all six synthetic Assignment 2-8 products under root."""
+    """Write synthetic Assignment 2-8 products under root."""
     base = root / "data/processed"
-    (base / "assignment-02").mkdir(parents=True, exist_ok=True)
-    (base / "assignment-05").mkdir(parents=True, exist_ok=True)
-    (base / "assignment-06").mkdir(parents=True, exist_ok=True)
-    (base / "assignment-08").mkdir(parents=True, exist_ok=True)
+    for name in ("assignment-02", "assignment-05", "assignment-06",
+                 "assignment-07", "assignment-08"):
+        (base / name).mkdir(parents=True, exist_ok=True)
 
     (base / "assignment-02" / "field_summary.csv").write_text(
         "field_count,total_area_ha,mean_area_ha,median_area_ha,"
@@ -74,6 +90,24 @@ def write_minimal_inputs(root: pathlib.Path) -> None:
             f"{field_id},2023,1,{name},0.9,1.0,{pixels},{pixels}")
     (base / "assignment-02" / "cdl_EPSG4326.csv").write_text(
         "\n".join(crop_rows) + "\n", encoding="utf-8")
+
+    features = []
+    for index in range(1, 26):
+        features.append({
+            "type": "Feature",
+            "properties": {
+                "field_id": f"STORY-{index:02d}",
+                "area_ha": index * 1.0,
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0],
+                                 [0.0, 1.0], [0.0, 0.0]]],
+            },
+        })
+    (base / "assignment-02" / "fields_EPSG4326.geojson").write_text(
+        json.dumps({"type": "FeatureCollection", "features": features}) + "\n",
+        encoding="utf-8")
 
     ndvi_rows = [
         "field_id,mean_ndvi,median_ndvi,valid_pixel_count,"
@@ -97,6 +131,31 @@ def write_minimal_inputs(root: pathlib.Path) -> None:
             "t2m_anomaly_2023_c": 1.8,
         }) + "\n",
         encoding="utf-8")
+    integration_rows = [
+        "field_id,crop_2023_name,dominant_soil,dominant_soil_name,"
+        "dominant_soil_mukey,dominant_soil_overlap_area_ha,mean_ndvi,"
+        "valid_pixel_count,total_pixel_count,ndvi_coverage_fraction",
+    ]
+    for index in range(1, 26):
+        name = "Corn" if index % 2 else "Soybeans"
+        code = 388 if index % 2 else 95
+        integration_rows.append(
+            f"STORY-{index:02d},{name},{code},\"Test soil {index}\",4113{index:02d},"
+            f"{index * 1.5:.2f},0.8,{index * 10},{index * 10},1.0")
+    (base / "assignment-07" / "integrated_field_summary.csv").write_text(
+        "\n".join(integration_rows) + "\n", encoding="utf-8")
+    soil_rows = [
+        "field_id,organic_matter_pct,ph_h2o,cec_cmol_kg,erosion_k_factor,"
+        "carbon_storage_mg_c_ha,soil_coverage_fraction,om_coverage_fraction,"
+        "ph_coverage_fraction,cec_coverage_fraction,erosion_coverage_fraction,"
+        "carbon_coverage_fraction",
+    ]
+    for index in range(1, 26):
+        soil_rows.append(
+            f"STORY-{index:02d},{2.0 + index * 0.1:.2f},6.5,20.0,0.28,"
+            f"{index * 5.0:.2f},1.0,1.0,1.0,1.0,1.0,1.0")
+    (base / "assignment-08" / "soil_health_by_field.csv").write_text(
+        "\n".join(soil_rows) + "\n", encoding="utf-8")
     metrics = {}
     for name, unit in (
         ("organic_matter_pct", "%"),
@@ -182,6 +241,99 @@ class DashboardDataTest(unittest.TestCase):
             ndvi_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
             with self.assertRaises(ValueError):
                 build_dashboard.build_payload(root)
+
+    def test_rejects_duplicate_integration_row(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            write_minimal_inputs(root)
+            integration_path = (root / "data/processed/assignment-07"
+                                / "integrated_field_summary.csv")
+            lines = integration_path.read_text(encoding="utf-8").splitlines()
+            lines.append(lines[1])
+            integration_path.write_text("\n".join(lines) + "\n",
+                                        encoding="utf-8")
+            with self.assertRaises(ValueError):
+                build_dashboard.build_payload(root)
+
+    def test_rejects_geojson_missing_area_ha(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            write_minimal_inputs(root)
+            geojson_path = (root / "data/processed/assignment-02"
+                            / "fields_EPSG4326.geojson")
+            document = json.loads(geojson_path.read_text(encoding="utf-8"))
+            del document["features"][0]["properties"]["area_ha"]
+            geojson_path.write_text(json.dumps(document) + "\n",
+                                    encoding="utf-8")
+            with self.assertRaises(ValueError):
+                build_dashboard.build_payload(root)
+
+    def test_rejects_non_integral_crop_valid_pixels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            write_minimal_inputs(root)
+            crops_path = (root / "data/processed/assignment-02"
+                          / "cdl_EPSG4326.csv")
+            lines = crops_path.read_text(encoding="utf-8").splitlines()
+            lines[1] = lines[1].replace("0.9,1.0,10,10", "0.9,1.0,10.5,10", 1)
+            crops_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                build_dashboard.build_payload(root)
+
+    def test_fields_records_match_spec_schema_sorted_and_finite(self):
+        payload = build_dashboard.build_payload(ROOT)
+        fields = payload["fields"]
+        self.assertEqual(len(fields), 25)
+        ids = [record["field_id"] for record in fields]
+        self.assertEqual(ids, sorted(ids))
+        self.assertEqual(len(set(ids)), 25)
+        for record in fields:
+            self.assertEqual(tuple(record), FIELD_SCHEMA, record["field_id"])
+            for key in FIELD_NUMERIC:
+                self.assertTrue(math.isfinite(float(record[key])),
+                                f"{record['field_id']}.{key}")
+            self.assertTrue(record["field_id"])
+            self.assertTrue(record["crop_2023"])
+            self.assertTrue(record["soil_type"])
+            self.assertTrue(record["soil_name"])
+        by_id = {record["field_id"]: record for record in fields}
+        self.assertIn("STORY-01", by_id)
+        self.assertIn("STORY-25", by_id)
+
+    def test_fields_ids_match_across_every_input(self):
+        payload = build_dashboard.build_payload(ROOT)
+        expected = {f"STORY-{index:02d}" for index in range(1, 26)}
+        self.assertEqual({record["field_id"] for record in payload["fields"]},
+                         expected)
+
+    def test_rejects_cross_source_field_id_mismatch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            write_minimal_inputs(root)
+            ndvi_path = (root / "data/processed/assignment-05"
+                         / "field_ndvi.csv")
+            lines = ndvi_path.read_text(encoding="utf-8").splitlines()
+            lines[1] = lines[1].replace("STORY-01", "STORY-99", 1)
+            ndvi_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                build_dashboard.build_payload(root)
+
+    def test_rejects_non_finite_field_value(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            write_minimal_inputs(root)
+            soil_path = (root / "data/processed/assignment-08"
+                         / "soil_health_by_field.csv")
+            lines = soil_path.read_text(encoding="utf-8").splitlines()
+            lines[1] = lines[1].replace(",6.5,", ",inf,", 1)
+            soil_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                build_dashboard.build_payload(root)
+
+    def test_fields_payload_is_deterministic(self):
+        first = build_dashboard.build_payload(ROOT)["fields"]
+        second = build_dashboard.build_payload(ROOT)["fields"]
+        self.assertEqual(first, second)
 
 
 def run_git(root: pathlib.Path, *args: str) -> None:
@@ -277,6 +429,63 @@ class LedeParser(HTMLParser):
     def handle_endtag(self, tag: str) -> None:
         if tag == "p" and self._depth:
             self._depth = 0
+
+
+class ControlsParser(HTMLParser):
+    """Collect labels, selects, buttons, and live regions."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.labels: dict[str, str] = {}
+        self.selects: list[dict[str, object]] = []
+        self.buttons: list[dict[str, object]] = []
+        self.live_regions: list[dict[str, str | None]] = []
+        self._label_for: str | None = None
+        self._label_text: list[str] = []
+        self._button_text: list[str] = []
+
+    def handle_starttag(self, tag: str,
+                        attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        if tag == "label" and values.get("for"):
+            self._label_for = values["for"]
+            self._label_text = []
+        if tag == "select":
+            self.selects.append({
+                "id": values.get("id"),
+                "disabled": values.get("disabled") is not None
+                            or "disabled" in values,
+                "name": values.get("name"),
+            })
+        if tag == "button" or (tag == "input"
+                               and values.get("type") == "reset"):
+            self.buttons.append({"text": "", "type": values.get("type")})
+            self._button_text = []
+        if values.get("aria-live"):
+            self.live_regions.append({
+                "id": values.get("id"),
+                "aria-live": values.get("aria-live"),
+            })
+
+    def handle_data(self, data: str) -> None:
+        if self._label_for is not None:
+            self._label_text.append(data)
+        if self.buttons:
+            self._button_text.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "label" and self._label_for is not None:
+            self.labels[self._label_for] = " ".join(self._label_text).strip()
+            self._label_for = None
+        if tag == "button" and self.buttons:
+            self.buttons[-1]["text"] = " ".join(self._button_text).strip()
+            self._button_text = []
+
+
+def parse_controls() -> ControlsParser:
+    parser = ControlsParser()
+    parser.feed((ROOT / "docs/index.html").read_text(encoding="utf-8"))
+    return parser
 
 
 class RepositoryVerifierTest(unittest.TestCase):
@@ -510,6 +719,128 @@ class DashboardPageTest(unittest.TestCase):
         self.assertIn(":focus", css)
         self.assertTrue(re.search(r"@media[^{]*max-width", css))
         self.assertIn("prefers-reduced-motion", css)
+
+    def test_filter_selects_disabled_with_labels(self):
+        parser = parse_controls()
+        select_ids = [select["id"] for select in parser.selects]
+        self.assertIn("field-id-filter", select_ids)
+        self.assertIn("soil-type-filter", select_ids)
+        for select in parser.selects:
+            if select["id"] in ("field-id-filter", "soil-type-filter"):
+                self.assertTrue(select["disabled"], select["id"])
+                label = parser.labels.get(str(select["id"]), "")
+                self.assertTrue(label, select["id"])
+        self.assertIn("Field ID", parser.labels.get("field-id-filter", ""))
+        self.assertIn("Soil Type", parser.labels.get("soil-type-filter", ""))
+
+    def test_reset_control_present(self):
+        parser = parse_controls()
+        self.assertTrue(any(
+            button.get("type") == "reset"
+            or "reset" in str(button.get("text", "")).lower()
+            for button in parser.buttons))
+
+    def test_polite_live_narrative_region(self):
+        parser = parse_controls()
+        self.assertTrue(any(
+            region["aria-live"] == "polite"
+            and "narrative" in str(region.get("id", "")).lower()
+            for region in parser.live_regions))
+
+    def test_ndvi_narrative_bands_and_scouting_copy_locked(self):
+        source = (ROOT / "docs/index.html").read_text(encoding="utf-8")
+        for src in re.findall(r'<script[^>]+src="([^"]+)"', source):
+            source += "\n" + (ROOT / "docs" / src).read_text(encoding="utf-8")
+        text = re.sub(r"\s+", " ", source)
+        self.assertIn("0.3", text)
+        self.assertIn("0.6", text)
+        self.assertIn("immediate scouting", text)
+        self.assertRegex(text,
+                         r"scene[^.<]{0,80}cannot confirm")
+
+    def test_rotation_figure_has_alt_and_source(self):
+        parser = parse_page()
+        rotations = [image for image in parser.images
+                     if image.get("src") == "assets/crop_rotation_patterns.png"]
+        self.assertEqual(len(rotations), 1)
+        self.assertTrue(rotations[0].get("alt", "").strip())
+        self.assertTrue(rotations[0].get("width")
+                        and rotations[0].get("height"))
+
+    def test_soil_options_use_type_and_name_while_filtering_by_type(self):
+        source = (ROOT / "docs/index.html").read_text(encoding="utf-8")
+        text = re.sub(r"\s+", " ", "".join(
+            re.findall(r"<script[^>]*>([\s\S]*?)</script>", source)))
+        self.assertRegex(text, r"soil_type[\s\S]{0,10}===\s*soilType")
+        windows = [text[max(0, match.start() - 400):match.start() + 400]
+                   for match in re.finditer(r"soil_name", text)]
+        self.assertTrue(windows and any("soilSelect" in window
+                                        for window in windows),
+                        "soil option labels should include soil_name")
+
+    def test_dominant_crop_tie_breaks_alphabetically(self):
+        source = (ROOT / "docs/index.html").read_text(encoding="utf-8")
+        text = re.sub(r"\s+", " ", "".join(
+            re.findall(r"<script[^>]*>([\s\S]*?)</script>", source)))
+        match = re.search(r"function dominantCrop[\s\S]{0,600}", text)
+        self.assertIsNotNone(match, "dominantCrop function missing")
+        self.assertRegex(match.group(0),
+                         r"localeCompare|name\s*<\s*best|best\s*>\s*name")
+
+    def test_status_shows_selection_count_and_no_match(self):
+        source = (ROOT / "docs/index.html").read_text(encoding="utf-8")
+        text = re.sub(r"\s+", " ", "".join(
+            re.findall(r"<script[^>]*>([\s\S]*?)</script>", source)))
+        self.assertIn("Showing ", text)
+        self.assertIn(" of ", text)
+        branch = re.search(r"!matches\.length([\s\S]*?)return", text)
+        self.assertIsNotNone(branch, "no-match branch missing")
+        self.assertIn("status", branch.group(1))
+
+    def test_fetch_error_updates_narrative_and_select_options(self):
+        source = (ROOT / "docs/index.html").read_text(encoding="utf-8")
+        text = re.sub(r"\s+", " ", "".join(
+            re.findall(r"<script[^>]*>([\s\S]*?)</script>", source)))
+        tail = re.search(r"\.catch\(([\s\S]*)$", text)
+        self.assertIsNotNone(tail, "fetch catch handler missing")
+        for token in ("narrative", "fieldSelect", "soilSelect"):
+            self.assertIn(token, tail.group(1), token)
+        self.assertRegex(tail.group(1),
+                         r"could not be loaded|unavailable|failed|error")
+
+
+class FinalProjectDocsTest(unittest.TestCase):
+    def test_readme_documents_final_project(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("feature/final-project-dashboard", readme)
+        self.assertIn("github.io", readme)
+        self.assertIn("AI_DOCS", readme)
+        self.assertIn("python -m http.server", readme)
+        self.assertIn("build_dashboard", readme)
+        self.assertNotIn("feature/final-dashboard` | Final project",
+                         readme)
+
+    def test_screenshots_are_valid_pngs_linked_from_readme(self):
+        screenshots = sorted((ROOT / "docs/screenshots").glob("*.png"))
+        self.assertTrue(3 <= len(screenshots) <= 5, len(screenshots))
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        for path in screenshots:
+            self.assertLessEqual(path.stat().st_size,
+                                 verify_repository.MAX_TRACKED_BYTES,
+                                 path.name)
+            with path.open("rb") as stream:
+                self.assertEqual(stream.read(8), b"\x89PNG\r\n\x1a\n",
+                                 path.name)
+            self.assertIn(path.relative_to(ROOT).as_posix(), readme,
+                          path.name)
+
+    def test_ai_docs_summarizes_ai_usage(self):
+        ai_docs = (ROOT / "docs/AI_DOCS.md").read_text(encoding="utf-8")
+        lowered = ai_docs.lower()
+        for phrase in ("generated", "verified", "review",
+                       "did not", "public data"):
+            self.assertIn(phrase, lowered, phrase)
+        self.assertNotRegex(ai_docs, r"ghp_|github_pat_|GOCSPX-")
 
 
 if __name__ == "__main__":

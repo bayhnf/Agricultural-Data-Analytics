@@ -32,6 +32,64 @@ uv pip install --python .venv/bin/python -r requirements.txt
 The Python environment is pinned to Python 3.12 and the exact versions in
 `requirements.txt`.
 
+## Final project dashboard
+
+The final deliverable is a dependency-free static dashboard published on GitHub
+Pages: https://bayhnf.github.io/Agricultural-Data-Analytics/
+
+It presents the integrated field-level results of Assignments 2–8 as KPI cards,
+five figure categories (field/EDA, geospatial map, NDVI, weather time series,
+soil health), and native Field ID / Soil Type filters with deterministic
+agronomic captions. No backend, database, or runtime AI API is involved; all
+rendering happens in the browser from committed JSON.
+
+Technologies used: Python 3.12 (geopandas, rasterio, pandas, numpy,
+matplotlib, requests, shapely, pyproj), standard-library JSON/CSV I/O, vanilla
+HTML/CSS/JavaScript, GitHub Pages.
+
+Regenerate the dashboard payload after changing any committed analysis product:
+
+```bash
+.venv/bin/python -m scripts.build_dashboard
+```
+
+Serve the docs locally (any static file server works; this one needs no
+dependency):
+
+```bash
+.venv/bin/python -m http.server 8000 --directory docs
+```
+
+Then open http://localhost:8000/
+
+### Scope notes
+
+- The dashboard uses the established 25-field Story County dataset produced and
+  validated by Assignments 2–8. The assignment PDF's reference to a
+  200-field package is treated as course-template wording, not a data change.
+- The supplied products contain crop classification but no measured or modeled
+  yield layer, so no "Predicted Total Bushels" KPI is shown; the dashboard uses
+  the available NDVI, crop, weather, and soil KPIs and discloses this
+  limitation instead of inventing an estimate.
+
+### AI usage and submission media
+
+- AI assistance for this project is summarized honestly in
+  [docs/AI_DOCS.md](docs/AI_DOCS.md).
+- Submission screenshots:
+  [package overview](docs/screenshots/01-package-overview.png),
+  [field STORY-01](docs/screenshots/02-field-story-01.png), and
+  [soil type L138B](docs/screenshots/03-soil-type-l138b.png).
+
+## Remaining user actions
+
+These steps require the owner's accounts and cannot be done from the
+repository:
+
+- attach the repository URL and screenshots in Google Classroom;
+- add the brief final reflection ("aha!") in the Google Classroom comments;
+- submit the assignment in Google Classroom.
+
 ## Raw-cache and privacy rules
 
 - Raw downloads, COG windows, county rasters, extracted SSURGO, and other large
@@ -53,7 +111,7 @@ The Python environment is pinned to Python 3.12 and the exact versions in
 | `feature/assignment-06-weather` | Assignment 6: Weather analysis |
 | `feature/assignment-07-zonal-stats` | Assignment 7: Spatial integration and zonal statistics |
 | `feature/assignment-08-soil-health` | Assignment 8: Soil health and sustainability |
-| `feature/final-dashboard` | Final project: static dashboard |
+| `feature/final-project-dashboard` | Final project: filterable field dashboard |
 
 ## Source limitations
 
