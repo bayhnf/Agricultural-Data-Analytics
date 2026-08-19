@@ -34,6 +34,37 @@
     <section id="kpis" aria-labelledby="kpis-heading">
       <h2 id="kpis-heading">Key figures</h2>
       <p id="kpi-status" role="status">Loading dashboard data…</p>
+      <form id="dashboard-filters" class="filters">
+        <fieldset>
+          <legend>Filter fields</legend>
+          <p class="filters-help">Both filters apply together. Field-level
+            figures update from the per-field payload; scene and weather
+            values stay package-wide.</p>
+          <div class="filters-row">
+            <div class="filter-group">
+              <label for="field-id-filter">Field ID</label>
+              <select id="field-id-filter" name="field-id" disabled>
+                <option value="">Loading fields…</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="soil-type-filter">Soil Type</label>
+              <select id="soil-type-filter" name="soil-type" disabled>
+                <option value="">Loading soil types…</option>
+              </select>
+            </div>
+            <button type="button" id="filter-reset">Reset filters</button>
+          </div>
+          <p id="package-wide-note" class="package-note" hidden>Scene date,
+            temperature anomaly, and precipitation are package-wide values
+            for the whole field package: the source data are not
+            field-specific, so they do not change with these filters.</p>
+        </fieldset>
+      </form>
+      <h3 id="narrative-heading">What the selection shows</h3>
+      <p id="narrative-region" aria-live="polite"
+         aria-labelledby="narrative-heading">Dashboard narrative will appear
+        once data loads.</p>
       <ul class="kpi-grid">
         <li>
           <span class="kpi-label">Field count</span>
@@ -117,6 +148,13 @@
         <figcaption>2023 crop mix by CDL valid-pixel area. CDL crop classes
           are satellite-derived estimates with classification
           uncertainty.</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/crop_rotation_patterns.png" width="1440" height="800"
+             alt="Exploratory data analysis heatmap of 2020 to 2023 crop sequences across the 25 field-analysis units">
+        <figcaption>Crop-rotation patterns, 2020–2023 (Assignment 3 EDA).
+          Sequences come from CDL classification, so they carry the same
+          classification uncertainty as the crop mix above.</figcaption>
       </figure>
     </section>
 
@@ -218,6 +256,15 @@
     (function () {
       "use strict";
       var status = document.getElementById("kpi-status");
+      var narrative = document.getElementById("narrative-region");
+      var fieldSelect = document.getElementById("field-id-filter");
+      var soilSelect = document.getElementById("soil-type-filter");
+      var resetButton = document.getElementById("filter-reset");
+      var packageNote = document.getElementById("package-wide-note");
+      var kpiTargets = Array.prototype.slice.call(
+        document.querySelectorAll("[data-kpi]"));
+      var PACKAGE_WIDE_KEYS = ["scene_date", "t2m_anomaly_2023_c",
+                               "precip_2023_mm"];
       var source = document.body.getAttribute("data-dashboard");
       var required = [
         "field_count", "total_area_ha", "dominant_crop_2023", "mean_ndvi",
@@ -225,6 +272,10 @@
         "precip_2023_mm", "mean_organic_matter_pct", "mean_ph",
         "mean_cec_cmol_kg", "mean_carbon_storage_mg_c_ha"
       ];
+      var FIELD_NUMBERS = ["area_ha", "crop_2023_pixels", "mean_ndvi",
+        "ndvi_coverage_fraction", "organic_matter_pct", "ph_h2o",
+        "cec_cmol_kg", "carbon_storage_mg_c_ha"];
+      var payload = null;
 
       function validate(data) {
         if (!data || typeof data !== "object") {
@@ -239,6 +290,20 @@
             throw new Error("non-finite KPI: " + key);
           }
         });
+        if (!Array.isArray(data.fields) || !data.fields.length) {
+          throw new Error("missing fields array");
+        }
+        data.fields.forEach(function (record) {
+          if (!record || typeof record !== "object" || !record.field_id) {
+            throw new Error("invalid field record");
+          }
+          FIELD_NUMBERS.forEach(function (key) {
+            if (typeof record[key] !== "number"
+                || !isFinite(record[key])) {
+              throw new Error("non-finite field value: " + key);
+            }
+          });
+        });
       }
 
       function format(value) {
@@ -250,13 +315,181 @@
         return String(value);
       }
 
+      function setKpi(key, value) {
+        var target = kpiTargets.find(function (element) {
+          return element.getAttribute("data-kpi") === key;
+        });
+        if (target) {
+          target.textContent = format(value);
+        }
+      }
+
+      function mean(records, key) {
+        var total = records.reduce(function (sum, record) {
+          return sum + record[key];
+        }, 0);
+        return total / records.length;
+      }
+
+      function dominantCrop(records) {
+        var totals = {};
+        var best = null;
+        records.forEach(function (record) {
+          totals[record.crop_2023] = (totals[record.crop_2023] || 0)
+            + record.crop_2023_pixels;
+        });
+        Object.keys(totals).forEach(function (name) {
+          if (best === null || totals[name] > totals[best]
+              || (totals[name] === totals[best] && name < best)) {
+            best = name;
+          }
+        });
+        return best;
+      }
+
+      function fillSelect(select, values, allLabel, toLabel) {
+        select.textContent = "";
+        select.add(new Option(allLabel, ""));
+        values.forEach(function (value) {
+          select.add(new Option(toLabel ? toLabel(value) : value, value));
+        });
+        select.disabled = false;
+      }
+
+      function soilLabel(record) {
+        return record.soil_type + " — " + record.soil_name;
+      }
+
+      function ndviBand(value) {
+        if (value < 0.3) {
+          return "Mean NDVI " + format(value) + " is below 0.3. Recommend " +
+            "immediate scouting for possible nutrient, pest, disease, " +
+            "water, or establishment pressure, and comparison with growth " +
+            "stage and field observations. One satellite scene cannot " +
+            "confirm which cause is present; this is not a claim of " +
+            "measured stress or yield loss.";
+        }
+        if (value <= 0.6) {
+          return "Mean NDVI " + format(value) + " is in the 0.3 to 0.6 " +
+            "watch band: canopy development is worth monitoring against " +
+            "growth stage and field observations. One satellite scene " +
+            "cannot confirm a cause.";
+        }
+        return "Mean NDVI " + format(value) + " is above 0.6: consistent " +
+          "with a developed canopy for this scene date. NDVI is a " +
+          "single-scene canopy signal, so continue routine monitoring.";
+      }
+
+      function buildNarrative(fields, active) {
+        var parts = [];
+        var count = fields.length;
+        var crop = dominantCrop(fields);
+        var meanNdvi = mean(fields, "mean_ndvi");
+        if (active) {
+          if (count === 1) {
+            var record = fields[0];
+            parts.push(record.field_id + ": " + format(record.area_ha) +
+              " ha, " + record.crop_2023 + " in 2023, dominant soil " +
+              soilLabel(record) + ".");
+          } else {
+            parts.push(count + " fields, " +
+              format(fields.reduce(function (sum, record) {
+                return sum + record.area_ha;
+              }, 0)) + " ha total, dominant crop " + crop + ".");
+          }
+        } else {
+          parts.push("Package overview: " + count + " fields, dominant " +
+            "crop " + crop + ".");
+        }
+        parts.push(ndviBand(meanNdvi));
+        parts.push("Screening context: mean organic matter " +
+          format(mean(fields, "organic_matter_pct")) + "%, mean pH " +
+          format(mean(fields, "ph_h2o")) + ".");
+        parts.push("NDVI is a single-scene canopy signal. Crop classes come " +
+          "from CDL satellite classification. SSURGO soil values are " +
+          "generalized screening estimates, not measured samples or " +
+          "management prescriptions.");
+        return parts.join(" ");
+      }
+
+      function applyFilters() {
+        if (!payload) {
+          return;
+        }
+        var fieldId = fieldSelect.value;
+        var soilType = soilSelect.value;
+        var active = Boolean(fieldId || soilType);
+        var matches = payload.fields.filter(function (record) {
+          return (!fieldId || record.field_id === fieldId)
+            && (!soilType || record.soil_type === soilType);
+        });
+        packageNote.hidden = !active;
+        if (!matches.length) {
+          kpiTargets.forEach(function (target) {
+            if (PACKAGE_WIDE_KEYS.indexOf(
+                target.getAttribute("data-kpi")) === -1) {
+              target.textContent = "—";
+            }
+          });
+          status.textContent = "No fields match the selected filters.";
+          narrative.textContent = "No fields match the selected Field ID " +
+            "and Soil Type combination. Adjust or reset the filters to " +
+            "see data again.";
+          return;
+        }
+        setKpi("field_count", matches.length);
+        setKpi("total_area_ha", matches.reduce(function (sum, record) {
+          return sum + record.area_ha;
+        }, 0));
+        setKpi("dominant_crop_2023", dominantCrop(matches));
+        setKpi("mean_ndvi", mean(matches, "mean_ndvi"));
+        setKpi("ndvi_coverage_pct",
+               mean(matches, "ndvi_coverage_fraction") * 100);
+        setKpi("mean_organic_matter_pct",
+               mean(matches, "organic_matter_pct"));
+        setKpi("mean_ph", mean(matches, "ph_h2o"));
+        setKpi("mean_cec_cmol_kg", mean(matches, "cec_cmol_kg"));
+        setKpi("mean_carbon_storage_mg_c_ha",
+               mean(matches, "carbon_storage_mg_c_ha"));
+        status.textContent = "Showing " + matches.length + " of " +
+          payload.fields.length + " fields.";
+        narrative.textContent = buildNarrative(matches, active);
+      }
+
       function render(data) {
-        document.querySelectorAll("[data-kpi]").forEach(function (target) {
+        kpiTargets.forEach(function (target) {
           var key = target.getAttribute("data-kpi");
           target.textContent = format(data[key]);
         });
+        fillSelect(fieldSelect,
+                   data.fields.map(function (record) {
+                     return record.field_id;
+                   }), "All fields");
+        var soilNames = {};
+        data.fields.forEach(function (record) {
+          if (!(record.soil_type in soilNames)) {
+            soilNames[record.soil_type] = record.soil_name;
+          }
+        });
+        var soilTypes = Object.keys(soilNames);
+        soilTypes.sort(function (a, b) {
+          return a.localeCompare(b, "en", { numeric: true });
+        });
+        fillSelect(soilSelect, soilTypes, "All soil types", function (code) {
+          return code + " — " + soilNames[code];
+        });
         status.textContent = "Dashboard data loaded.";
+        applyFilters();
       }
+
+      fieldSelect.addEventListener("change", applyFilters);
+      soilSelect.addEventListener("change", applyFilters);
+      resetButton.addEventListener("click", function () {
+        fieldSelect.value = "";
+        soilSelect.value = "";
+        applyFilters();
+        fieldSelect.focus();
+      });
 
       fetch(source)
         .then(function (response) {
@@ -267,10 +500,15 @@
         })
         .then(function (data) {
           validate(data);
+          payload = data;
           render(data);
         })
         .catch(function () {
           status.textContent = "Dashboard data could not be loaded. Please reload the page to try again.";
+          fieldSelect.options[0].textContent = "Field list unavailable";
+          soilSelect.options[0].textContent = "Soil types unavailable";
+          narrative.textContent = "Dashboard data could not be loaded. " +
+            "Please reload the page to try again.";
         });
     }());
   </script>
