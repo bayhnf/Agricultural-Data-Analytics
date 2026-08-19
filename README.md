@@ -76,9 +76,10 @@ Then open http://localhost:8000/
 
 - AI assistance for this project is summarized honestly in
   [docs/AI_DOCS.md](docs/AI_DOCS.md).
-- Three to five screenshots of the finished dashboard (package overview plus
-  different sections and filter states) will be captured and linked here
-  before submission.
+- Submission screenshots:
+  [package overview](docs/screenshots/01-package-overview.png),
+  [field STORY-01](docs/screenshots/02-field-story-01.png), and
+  [soil type L138B](docs/screenshots/03-soil-type-l138b.png).
 
 ## Remaining user actions
 
