@@ -767,6 +767,47 @@ class DashboardPageTest(unittest.TestCase):
         self.assertTrue(rotations[0].get("width")
                         and rotations[0].get("height"))
 
+    def test_soil_options_use_type_and_name_while_filtering_by_type(self):
+        source = (ROOT / "docs/index.html").read_text(encoding="utf-8")
+        text = re.sub(r"\s+", " ", "".join(
+            re.findall(r"<script[^>]*>([\s\S]*?)</script>", source)))
+        self.assertRegex(text, r"soil_type[\s\S]{0,10}===\s*soilType")
+        windows = [text[max(0, match.start() - 400):match.start() + 400]
+                   for match in re.finditer(r"soil_name", text)]
+        self.assertTrue(windows and any("soilSelect" in window
+                                        for window in windows),
+                        "soil option labels should include soil_name")
+
+    def test_dominant_crop_tie_breaks_alphabetically(self):
+        source = (ROOT / "docs/index.html").read_text(encoding="utf-8")
+        text = re.sub(r"\s+", " ", "".join(
+            re.findall(r"<script[^>]*>([\s\S]*?)</script>", source)))
+        match = re.search(r"function dominantCrop[\s\S]{0,600}", text)
+        self.assertIsNotNone(match, "dominantCrop function missing")
+        self.assertRegex(match.group(0),
+                         r"localeCompare|name\s*<\s*best|best\s*>\s*name")
+
+    def test_status_shows_selection_count_and_no_match(self):
+        source = (ROOT / "docs/index.html").read_text(encoding="utf-8")
+        text = re.sub(r"\s+", " ", "".join(
+            re.findall(r"<script[^>]*>([\s\S]*?)</script>", source)))
+        self.assertIn("Showing ", text)
+        self.assertIn(" of ", text)
+        branch = re.search(r"!matches\.length([\s\S]*?)return", text)
+        self.assertIsNotNone(branch, "no-match branch missing")
+        self.assertIn("status", branch.group(1))
+
+    def test_fetch_error_updates_narrative_and_select_options(self):
+        source = (ROOT / "docs/index.html").read_text(encoding="utf-8")
+        text = re.sub(r"\s+", " ", "".join(
+            re.findall(r"<script[^>]*>([\s\S]*?)</script>", source)))
+        tail = re.search(r"\.catch\(([\s\S]*)$", text)
+        self.assertIsNotNone(tail, "fetch catch handler missing")
+        for token in ("narrative", "fieldSelect", "soilSelect"):
+            self.assertIn(token, tail.group(1), token)
+        self.assertRegex(tail.group(1),
+                         r"could not be loaded|unavailable|failed|error")
+
 
 class FinalProjectDocsTest(unittest.TestCase):
     def test_readme_documents_final_project(self):
