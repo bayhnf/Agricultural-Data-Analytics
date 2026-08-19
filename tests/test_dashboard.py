@@ -242,6 +242,44 @@ class DashboardDataTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 build_dashboard.build_payload(root)
 
+    def test_rejects_duplicate_integration_row(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            write_minimal_inputs(root)
+            integration_path = (root / "data/processed/assignment-07"
+                                / "integrated_field_summary.csv")
+            lines = integration_path.read_text(encoding="utf-8").splitlines()
+            lines.append(lines[1])
+            integration_path.write_text("\n".join(lines) + "\n",
+                                        encoding="utf-8")
+            with self.assertRaises(ValueError):
+                build_dashboard.build_payload(root)
+
+    def test_rejects_geojson_missing_area_ha(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            write_minimal_inputs(root)
+            geojson_path = (root / "data/processed/assignment-02"
+                            / "fields_EPSG4326.geojson")
+            document = json.loads(geojson_path.read_text(encoding="utf-8"))
+            del document["features"][0]["properties"]["area_ha"]
+            geojson_path.write_text(json.dumps(document) + "\n",
+                                    encoding="utf-8")
+            with self.assertRaises(ValueError):
+                build_dashboard.build_payload(root)
+
+    def test_rejects_non_integral_crop_valid_pixels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            write_minimal_inputs(root)
+            crops_path = (root / "data/processed/assignment-02"
+                          / "cdl_EPSG4326.csv")
+            lines = crops_path.read_text(encoding="utf-8").splitlines()
+            lines[1] = lines[1].replace("0.9,1.0,10,10", "0.9,1.0,10.5,10", 1)
+            crops_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                build_dashboard.build_payload(root)
+
     def test_fields_records_match_spec_schema_sorted_and_finite(self):
         payload = build_dashboard.build_payload(ROOT)
         fields = payload["fields"]
