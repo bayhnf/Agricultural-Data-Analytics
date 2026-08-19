@@ -89,8 +89,8 @@ an API, a database, or a runtime language-model dependency.
 
 1. Commit the implementation in small logical commits on
    `feature/final-project-dashboard`.
-2. Push the branch using the process-only GitHub token from
-   `/home/bell/.hermes/.env`.
+2. Push the branch using the process-only GitHub token from the configured
+   Hermes secret environment; never print or persist it.
 3. Open a pull request, run its checks, and merge it into `main`.
 4. Push/verify `main` and recheck the public GitHub Pages dashboard and asset
    links.

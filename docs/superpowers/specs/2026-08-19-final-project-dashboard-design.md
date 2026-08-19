@@ -1,7 +1,7 @@
 # Final Project Dashboard Enhancement Design
 
-**Date:** 2026-08-19  
-**Branch:** `feature/final-project-dashboard`  
+**Date:** 2026-08-19
+**Branch:** `feature/final-project-dashboard`
 **Assignment:** 9 — Row Crop Intelligence Data Dashboard
 
 ## Goal
