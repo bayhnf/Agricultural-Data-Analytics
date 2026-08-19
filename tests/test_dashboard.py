@@ -820,6 +820,20 @@ class FinalProjectDocsTest(unittest.TestCase):
         self.assertNotIn("feature/final-dashboard` | Final project",
                          readme)
 
+    def test_screenshots_are_valid_pngs_linked_from_readme(self):
+        screenshots = sorted((ROOT / "docs/screenshots").glob("*.png"))
+        self.assertTrue(3 <= len(screenshots) <= 5, len(screenshots))
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        for path in screenshots:
+            self.assertLessEqual(path.stat().st_size,
+                                 verify_repository.MAX_TRACKED_BYTES,
+                                 path.name)
+            with path.open("rb") as stream:
+                self.assertEqual(stream.read(8), b"\x89PNG\r\n\x1a\n",
+                                 path.name)
+            self.assertIn(path.relative_to(ROOT).as_posix(), readme,
+                          path.name)
+
     def test_ai_docs_summarizes_ai_usage(self):
         ai_docs = (ROOT / "docs/AI_DOCS.md").read_text(encoding="utf-8")
         lowered = ai_docs.lower()
